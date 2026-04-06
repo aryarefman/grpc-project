@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package citynexus.traffic;
+
+// ============================================================================
+// TrafficService - Manages traffic intersections, lights, and incidents
+// Features: Unary RPC + Server-side Streaming
+// ============================================================================
+
+service TrafficService {
+  // ── Unary RPCs ──────────────────────────────────────────────────────────
+  
+  // Get status of a specific intersection
+  rpc GetIntersectionStatus (IntersectionRequest) returns (IntersectionStatus);
+  
+  // Get all intersections
+  rpc ListIntersections (Empty) returns (IntersectionList);
+  
+  // Update traffic light at an intersection
+  rpc UpdateTrafficLight (TrafficLightUpdate) returns (TrafficLightResponse);
+  
+  // Report a traffic incident
+  rpc ReportIncident (IncidentReport) returns (IncidentResponse);
+  
+  // Get a specific incident by ID
+  rpc GetIncident (IncidentRequest) returns (IncidentDetail);
+  
+  // Resolve a traffic incident
+  rpc ResolveIncident (ResolveIncidentRequest) returns (IncidentResponse);
+
+  // ── Server-side Streaming RPC ───────────────────────────────────────────
+  
+  // Monitor real-time traffic updates for a specific zone
+  rpc MonitorTraffic (MonitorRequest) returns (stream TrafficUpdate);
+}
+
+// ── Messages ──────────────────────────────────────────────────────────────
+
+message Empty {}
+
+message IntersectionRequest {
+  string intersection_id = 1;
+}
+
+message IntersectionStatus {
+  string intersection_id = 1;
+  string name = 2;
+  string zone = 3;
+  string current_light = 4;       // RED, YELLOW, GREEN
+  int32 vehicle_count = 5;
+  float congestion_level = 6;     // 0.0 - 1.0
+  string status = 7;              // NORMAL, CONGESTED, BLOCKED
+  int64 last_updated = 8;
+}
+
+message IntersectionList {
+  repeated IntersectionStatus intersections = 1;
+}
+
+message TrafficLightUpdate {
+  string intersection_id = 1;
+  string new_light = 2;           // RED, YELLOW, GREEN
+  int32 duration_seconds = 3;
+  string reason = 4;
+}
+
+message TrafficLightResponse {
+  bool success = 1;
+  string message = 2;
+  string intersection_id = 3;
+  string previous_light = 4;
+  string current_light = 5;
+}
+
+message IncidentReport {
+  string intersection_id = 1;
+  string type = 2;                // ACCIDENT, CONSTRUCTION, FLOOD, BREAKDOWN
+  string severity = 3;            // LOW, MEDIUM, HIGH, CRITICAL
+  string description = 4;
+  string reported_by = 5;
+}
+
+message IncidentResponse {
+  bool success = 1;
+  string message = 2;
+  string incident_id = 3;
+  string status = 4;
+}
+
+message IncidentRequest {
+  string incident_id = 1;
+}
+
+message ResolveIncidentRequest {
+  string incident_id = 1;
+  string resolved_by = 2;
+  string resolution_notes = 3;
+}
+
+message IncidentDetail {
+  string incident_id = 1;
+  string intersection_id = 2;
+  string type = 3;
+  string severity = 4;
+  string description = 5;
+  string reported_by = 6;
+  string status = 7;              // OPEN, RESOLVED
+  int64 reported_at = 8;
+  int64 resolved_at = 9;
+  string resolved_by = 10;
+  string resolution_notes = 11;
+}
+
+message MonitorRequest {
+  string zone = 1;                // Zone to monitor (e.g., "NORTH", "SOUTH", "ALL")
+}
+
+message TrafficUpdate {
+  string intersection_id = 1;
+  string name = 2;
+  string event_type = 3;          // LIGHT_CHANGE, CONGESTION_UPDATE, INCIDENT, VEHICLE_COUNT
+  string current_light = 4;
+  int32 vehicle_count = 5;
+  float congestion_level = 6;
+  string details = 7;
+  int64 timestamp = 8;
+  string status = 9;
+}

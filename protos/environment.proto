@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package citynexus.environment;
+
+// ============================================================================
+// EnvironmentService - IoT sensor monitoring for air quality, weather, etc.
+// Features: Unary RPC + Bi-directional Streaming
+// ============================================================================
+
+service EnvironmentService {
+  // ── Unary RPCs ──────────────────────────────────────────────────────────
+  
+  // Register a new IoT sensor
+  rpc RegisterSensor (SensorRegistration) returns (SensorRegistrationResponse);
+  
+  // Get current reading from a specific sensor
+  rpc GetSensorReading (SensorRequest) returns (SensorReading);
+  
+  // Get all sensors
+  rpc ListSensors (Empty) returns (SensorList);
+  
+  // Get environmental report for an area
+  rpc GetAreaReport (AreaReportRequest) returns (AreaReport);
+  
+  // Remove a sensor
+  rpc RemoveSensor (SensorRequest) returns (RemoveSensorResponse);
+
+  // ── Bi-directional Streaming RPC ────────────────────────────────────────
+  
+  // Live sensor data exchange: sensors stream data, server streams alerts back
+  rpc LiveSensorStream (stream SensorDataInput) returns (stream SensorAlert);
+}
+
+// ── Messages ──────────────────────────────────────────────────────────────
+
+message Empty {}
+
+message SensorRegistration {
+  string name = 1;
+  string type = 2;                // AIR_QUALITY, TEMPERATURE, HUMIDITY, NOISE, WATER_QUALITY
+  string location = 3;
+  string zone = 4;
+  double latitude = 5;
+  double longitude = 6;
+}
+
+message SensorRegistrationResponse {
+  bool success = 1;
+  string message = 2;
+  string sensor_id = 3;
+}
+
+message SensorRequest {
+  string sensor_id = 1;
+}
+
+message SensorReading {
+  string sensor_id = 1;
+  string name = 2;
+  string type = 3;
+  string location = 4;
+  string zone = 5;
+  double value = 6;
+  string unit = 7;
+  string quality_level = 8;       // GOOD, MODERATE, POOR, HAZARDOUS
+  string status = 9;              // ONLINE, OFFLINE, MAINTENANCE
+  int64 last_reading_at = 10;
+}
+
+message SensorList {
+  repeated SensorReading sensors = 1;
+}
+
+message AreaReportRequest {
+  string zone = 1;
+}
+
+message AreaReport {
+  string zone = 1;
+  double avg_air_quality_index = 2;
+  double avg_temperature = 3;
+  double avg_humidity = 4;
+  double avg_noise_level = 5;
+  string overall_quality = 6;     // EXCELLENT, GOOD, MODERATE, POOR, HAZARDOUS
+  int32 active_sensors = 7;
+  int32 alerts_count = 8;
+  repeated SensorReading sensor_readings = 9;
+  int64 generated_at = 10;
+}
+
+message RemoveSensorResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message SensorDataInput {
+  string sensor_id = 1;
+  double value = 2;
+  int64 timestamp = 3;
+  map<string, string> metadata = 4;
+}
+
+message SensorAlert {
+  string alert_id = 1;
+  string sensor_id = 2;
+  string sensor_name = 3;
+  string alert_type = 4;          // THRESHOLD_EXCEEDED, SENSOR_OFFLINE, RAPID_CHANGE, ANOMALY
+  string severity = 5;            // INFO, WARNING, CRITICAL
+  string message = 6;
+  double current_value = 7;
+  double threshold_value = 8;
+  int64 timestamp = 9;
+}

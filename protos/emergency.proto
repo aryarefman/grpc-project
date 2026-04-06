@@ -1,0 +1,162 @@
+syntax = "proto3";
+
+package citynexus.emergency;
+
+// ============================================================================
+// EmergencyService - Emergency dispatch, unit tracking, and alert system
+// Features: Unary RPC + Server-side Streaming
+// ============================================================================
+
+service EmergencyService {
+  // ── Unary RPCs ──────────────────────────────────────────────────────────
+  
+  // Create a new emergency alert
+  rpc CreateAlert (CreateAlertRequest) returns (AlertResponse);
+  
+  // Get a specific alert
+  rpc GetAlert (AlertRequest) returns (AlertDetail);
+  
+  // List all active alerts
+  rpc ListActiveAlerts (Empty) returns (AlertList);
+  
+  // Dispatch an emergency unit to an alert
+  rpc DispatchUnit (DispatchRequest) returns (DispatchResponse);
+  
+  // Update unit status (location, availability)
+  rpc UpdateUnitStatus (UnitStatusUpdate) returns (UnitStatusResponse);
+  
+  // Get unit information
+  rpc GetUnit (UnitRequest) returns (UnitDetail);
+  
+  // List all units
+  rpc ListUnits (Empty) returns (UnitList);
+  
+  // Resolve an alert
+  rpc ResolveAlert (ResolveAlertRequest) returns (AlertResponse);
+
+  // ── Server-side Streaming RPC ───────────────────────────────────────────
+  
+  // Subscribe to real-time emergency alerts for a zone
+  rpc SubscribeAlerts (SubscribeRequest) returns (stream EmergencyEvent);
+}
+
+// ── Messages ──────────────────────────────────────────────────────────────
+
+message Empty {}
+
+message CreateAlertRequest {
+  string type = 1;                // FIRE, MEDICAL, CRIME, NATURAL_DISASTER, HAZMAT, TRAFFIC_ACCIDENT
+  string severity = 2;            // LOW, MEDIUM, HIGH, CRITICAL
+  string location = 3;
+  string zone = 4;
+  double latitude = 5;
+  double longitude = 6;
+  string description = 7;
+  string reporter_name = 8;
+  string reporter_contact = 9;
+}
+
+message AlertResponse {
+  bool success = 1;
+  string message = 2;
+  string alert_id = 3;
+}
+
+message AlertRequest {
+  string alert_id = 1;
+}
+
+message AlertDetail {
+  string alert_id = 1;
+  string type = 2;
+  string severity = 3;
+  string location = 4;
+  string zone = 5;
+  double latitude = 6;
+  double longitude = 7;
+  string description = 8;
+  string reporter_name = 9;
+  string reporter_contact = 10;
+  string status = 11;            // PENDING, DISPATCHED, IN_PROGRESS, RESOLVED
+  repeated string assigned_units = 12;
+  int64 created_at = 13;
+  int64 resolved_at = 14;
+  string resolution_notes = 15;
+}
+
+message AlertList {
+  repeated AlertDetail alerts = 1;
+}
+
+message DispatchRequest {
+  string alert_id = 1;
+  string unit_id = 2;
+}
+
+message DispatchResponse {
+  bool success = 1;
+  string message = 2;
+  string alert_id = 3;
+  string unit_id = 4;
+  string estimated_arrival = 5;
+}
+
+message UnitStatusUpdate {
+  string unit_id = 1;
+  string status = 2;             // AVAILABLE, DISPATCHED, EN_ROUTE, ON_SCENE, RETURNING
+  double latitude = 3;
+  double longitude = 4;
+  string notes = 5;
+}
+
+message UnitStatusResponse {
+  bool success = 1;
+  string message = 2;
+  string unit_id = 3;
+  string current_status = 4;
+}
+
+message UnitRequest {
+  string unit_id = 1;
+}
+
+message UnitDetail {
+  string unit_id = 1;
+  string name = 2;
+  string type = 3;               // AMBULANCE, FIRE_TRUCK, POLICE, HAZMAT, RESCUE
+  string status = 4;
+  double latitude = 5;
+  double longitude = 6;
+  string current_alert_id = 7;
+  int32 personnel_count = 8;
+  int64 last_updated = 9;
+}
+
+message UnitList {
+  repeated UnitDetail units = 1;
+}
+
+message ResolveAlertRequest {
+  string alert_id = 1;
+  string resolved_by = 2;
+  string resolution_notes = 3;
+}
+
+message SubscribeRequest {
+  string zone = 1;               // Zone to subscribe (e.g., "NORTH", "ALL")
+  string min_severity = 2;       // Minimum severity to receive (e.g., "MEDIUM")
+}
+
+message EmergencyEvent {
+  string event_id = 1;
+  string event_type = 2;         // NEW_ALERT, UNIT_DISPATCHED, STATUS_UPDATE, ALERT_RESOLVED
+  string alert_id = 3;
+  string alert_type = 4;
+  string severity = 5;
+  string location = 6;
+  string zone = 7;
+  string description = 8;
+  string unit_id = 9;
+  string unit_name = 10;
+  int64 timestamp = 11;
+}
