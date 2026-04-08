@@ -1,5 +1,25 @@
 # 🧠 NovaPulse - Smart City gRPC Nervous System
 
+# Output
+## Server
+<img width="1482" height="1003" alt="image" src="https://github.com/user-attachments/assets/d6d040e8-1db5-4176-9208-f5010bd2d4dc" />
+
+## Traffic
+<img width="1125" height="848" alt="image" src="https://github.com/user-attachments/assets/5d0ba6aa-47a4-42a1-baf5-5eaaa6136242" />
+<img width="670" height="382" alt="image" src="https://github.com/user-attachments/assets/39108b7e-e36d-45ff-9b9d-999ad00f8c90" />
+
+## Environment
+<img width="969" height="847" alt="image" src="https://github.com/user-attachments/assets/bd5f22a5-80c8-44da-a5d3-e90903992500" />
+<img width="1037" height="1053" alt="image" src="https://github.com/user-attachments/assets/3990cc4c-a633-49b1-ba51-a072bfd8633e" />
+
+## Emergency
+<img width="880" height="638" alt="image" src="https://github.com/user-attachments/assets/23dbf5c5-9639-4f83-a230-e369485a6c09" />
+<img width="1394" height="929" alt="image" src="https://github.com/user-attachments/assets/360be17f-077f-456e-9ae0-555a3afa3e6d" />
+
+## Dashboard
+<img width="560" height="1026" alt="image" src="https://github.com/user-attachments/assets/16eee969-0b8c-47b7-a460-9de02bbe0578" />
+<img width="1389" height="365" alt="image" src="https://github.com/user-attachments/assets/3d5cb122-c088-4f90-9060-1def9a236452" />
+
 > Sistem monitoring, manajemen, dan **orkestrasi** kota pintar secara real-time menggunakan gRPC
 
 ## 📋 Deskripsi
