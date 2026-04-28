@@ -22,10 +22,10 @@
 ## 🎙️ SEGMEN 1 — DESKRIPSI & ARSITEKTUR (2–3 menit)
 
 ### Kata Pembuka
-> *"Halo, perkenalkan saya [nama]. Ini adalah presentasi Week 9 — implementasi WebSocket yang terintegrasi dengan gRPC. Proyeknya bernama NovaPulse, Smart City Command & Control Center."*
+> *"Halo, perkenalkan saya [nama]. Ini presentasi Week 9 saya — tentang cara menghubungkan WebSocket dengan gRPC. Proyek ini namanya NovaPulse, yaitu dashboard pemantau kota pintar."*
 
 ### Deskripsi Proyek
-> *"NovaPulse adalah sistem monitoring kota pintar real-time. Ada tiga layanan gRPC di backend: TrafficService untuk manajemen persimpangan dan lampu lalu lintas, EmergencyService untuk alert darurat dan dispatch unit, dan EnvironmentService untuk sensor IoT seperti kualitas udara dan suhu."*
+> *"NovaPulse adalah aplikasi yang memantau kondisi kota secara langsung dan otomatis. Di dalamnya ada tiga layanan gRPC: satu untuk mengatur lampu lalu lintas dan persimpangan, satu untuk mengelola situasi darurat seperti kebakaran dan kecelakaan, dan satu lagi untuk membaca sensor lingkungan seperti kualitas udara dan suhu."*
 
 ### Arsitektur (sambil tunjuk diagram)
 
@@ -55,7 +55,7 @@
 └──────────────────────────────────────────────┘
 ```
 
-> *"Browser berkomunikasi lewat WebSocket ke Bridge di port 3000. Bridge meneruskan data gRPC streaming ke browser, dan menerima command dari browser untuk memanggil gRPC. Semua data terpusat di InMemoryStore yang juga EventEmitter — setiap perubahan data langsung emit event yang ditangkap streaming RPC."*
+> *"Cara kerjanya seperti ini: Browser terhubung ke WebSocket Bridge lewat port 3000. Bridge ini bertugas seperti penerjemah — ia menerima data yang mengalir dari gRPC lalu meneruskannya ke browser, dan sebaliknya, ia menerima perintah dari browser lalu meneruskannya ke gRPC. Semua data disimpan di InMemoryStore. Setiap kali ada data yang berubah, Store otomatis memberitahu semua layanan yang perlu tahu."*
 
 ---
 
@@ -67,11 +67,11 @@
 
 **[Tunjukkan browser http://localhost:3000, lihat status bar atas]**
 
-> *"Saat browser dibuka, koneksi WebSocket langsung terbentuk. Status berubah jadi SECURE LINK ACTIVE — dot hijau berkedip. Activity Log langsung terisi tanpa klik apapun, karena server langsung push initial state."*
+> *"Begitu browser dibuka, koneksi WebSocket langsung terbentuk secara otomatis. Lihat di pojok kanan atas — statusnya berubah jadi SECURE LINK ACTIVE dengan titik hijau berkedip. Dan log aktivitas di bawahnya langsung terisi sendiri, padahal kita belum klik tombol apapun. Ini karena server langsung mengirim data awal ke browser saat koneksi pertama kali terbentuk."*
 
 **[Buka DevTools → Network → WS, tunjukkan frame masuk]**
 
-> *"Di DevTools kita bisa lihat frame WebSocket yang masuk tiap beberapa detik — format JSON dengan field `type`, `data`, dan `ts`. Inilah perbedaan WebSocket: koneksi persistent, server bisa kirim kapan saja tanpa diminta."*
+> *"Kalau kita buka DevTools dan lihat tab Network → WS, kita bisa lihat data yang terus masuk setiap beberapa detik. Formatnya JSON sederhana dengan tiga bagian: `type` untuk jenis datanya, `data` untuk isinya, dan `ts` untuk waktunya. Ini yang membedakan WebSocket dari website biasa — koneksinya tidak putus, jadi server bisa kapan saja kirim data ke browser tanpa harus ditanya dulu."*
 
 **📍 Kode yang relevan:**
 
@@ -84,7 +84,7 @@ const httpServer = http.createServer(app);
 attachWebSocket(httpServer);          // ← Bridge dipasang ke server yang sama
 httpServer.listen(WEB_PORT, ...);     // Port 3000: HTTP + WS sekaligus
 ```
-> 💡 **Kesimpulan Inti:** Satu HTTP server di port 3000 melayani dua protokol sekaligus — HTTP untuk file statis (HTML/CSS/JS) dan WebSocket untuk komunikasi real-time. Browser tidak perlu port berbeda.
+> 💡 **Kesimpulan Inti:** Bayangkan satu pintu toko yang bisa melayani dua jenis pelanggan — yang mau beli barang (HTTP/halaman web) dan yang mau ngobrol langsung (WebSocket). Keduanya pakai port yang sama yaitu 3000, jadi browser tidak perlu alamat berbeda.
 
 ```
 📄 server/websocketBridge.js — Baris 312–347
@@ -110,7 +110,7 @@ function attachWebSocket(httpServer) {
   });
 }
 ```
-> 💡 **Kesimpulan Inti:** Saat browser baru connect, server langsung push `initial_state` berisi seluruh data kota — jadi UI sudah terisi penuh tanpa perlu browser melakukan request apapun. Setiap message dari browser juga langsung diteruskan ke `handleClientCommand` (Command Bridge).
+> 💡 **Kesimpulan Inti:** Bayangkan seperti masuk ruang rapat — begitu duduk, langsung dikasih dokumen ringkasan situasi terkini tanpa perlu minta. Begitu juga browser: begitu connect, server langsung kirim semua data (persimpangan, sensor, alert) supaya tampilan langsung terisi penuh.
 
 ```
 📄 web/app.js — Baris 21–54
@@ -130,19 +130,19 @@ function connectWS() {
   });
 }
 ```
-> 💡 **Kesimpulan Inti:** Browser membuka satu koneksi WebSocket persistent yang menangani semua jenis data — traffic, emergency, sensor, command result — cukup dengan satu event listener `message` yang meneruskan ke router `handleMessage()`.
+> 💡 **Kesimpulan Inti:** Browser hanya butuh satu saluran komunikasi (koneksi WebSocket) untuk menerima semua jenis data — traffic, darurat, sensor, hasil perintah — semuanya masuk lewat satu fungsi `handleMessage()` yang kemudian memilah-milah datanya.
 
 ---
 
 ### 📊 FITUR 2: Event-Driven UI — 3 Komponen Dinamis
 
-> *"Ada 3 komponen yang berubah dinamis berdasarkan pesan WebSocket."*
+> *"Ada 3 bagian tampilan yang berubah otomatis setiap kali ada data baru masuk dari WebSocket. Mari kita lihat satu per satu."*
 
 **[Tunjukkan ketiga komponen sambil narasi]**
 
 #### Komponen 1 — Traffic Chart (Canvas Bar Chart)
 
-> *"Komponen pertama adalah bar chart di atas. Di-render ulang setiap ada `traffic_update`. Bar merah = macet >70%, kuning 50–70%, hijau normal. Bergerak sendiri karena simulasi di InMemoryStore."*
+> *"Bagian pertama adalah grafik batang di atas layar. Grafik ini otomatis digambar ulang setiap kali ada data traffic baru masuk. Batang berwarna merah artinya persimpangan itu sangat macet (di atas 70%), kuning berarti agak padat, hijau berarti lancar. Grafik ini bergerak sendiri karena di dalam server ada simulasi yang mengubah data setiap 5 detik."*
 
 **📍 Kode:**
 ```
@@ -162,7 +162,7 @@ function renderTrafficChart() {
   });
 }
 ```
-> 💡 **Kesimpulan Inti:** Chart dirender ulang dari nol setiap ada data baru masuk — warna bar berubah otomatis berdasarkan nilai `congestion_level` yang datang dari WebSocket, tanpa library Chart.js, murni HTML5 Canvas.
+> 💡 **Kesimpulan Inti:** Grafik ini dibuat langsung pakai HTML5 Canvas tanpa plugin tambahan. Warnanya berubah otomatis tergantung data `congestion_level` yang datang dari WebSocket — semakin tinggi nilainya, semakin merah batangnya.
 
 ```
 📄 web/app.js — Baris 81–93 (trigger render dari WebSocket)
@@ -175,11 +175,11 @@ case 'traffic_update': {              // Baris 81
   logActivity('TRAFFIC', ...);        // Baris 92 → update log
 }
 ```
-> 💡 **Kesimpulan Inti:** Satu event `traffic_update` dari WebSocket memicu tiga komponen sekaligus — chart, grid, dan log — inilah inti dari arsitektur event-driven: satu sumber data, banyak komponen yang bereaksi.
+> 💡 **Kesimpulan Inti:** Satu pesan WebSocket `traffic_update` langsung menggerakkan tiga bagian tampilan sekaligus — grafik, daftar persimpangan, dan log. Inilah yang disebut event-driven: satu sinyal, banyak yang bereaksi.
 
 #### Komponen 2 — Intersection Grid (Status Indikator)
 
-> *"Komponen kedua adalah grid status persimpangan — lampu, congestion bar, jumlah kendaraan. Diurutkan otomatis dari yang paling padat."*
+> *"Bagian kedua adalah daftar status persimpangan. Setiap baris menampilkan warna lampu (merah/kuning/hijau), nama jalan, bar tingkat kemacetan, dan jumlah kendaraan. Daftar ini otomatis diurutkan dari yang paling macet ke paling lancar."*
 
 **📍 Kode:**
 ```
@@ -200,11 +200,11 @@ function renderIntersections() {
     </div>`).join('');
 }
 ```
-> 💡 **Kesimpulan Inti:** Grid ini bukan hanya tampilan statis — data diurutkan ulang setiap render sehingga persimpangan paling macet selalu tampil di atas secara otomatis, tanpa interaksi user.
+> 💡 **Kesimpulan Inti:** Daftar ini bukan tampilan statis — setiap kali data baru masuk, data diurutkan ulang dari yang paling macet. Jadi persimpangan yang paling butuh perhatian selalu ada di posisi teratas secara otomatis.
 
 #### Komponen 3 — Activity Log (Live Stream Log)
 
-> *"Komponen ketiga adalah Activity Log. Setiap pesan WebSocket apapun dicatat di sini — TRAFFIC biru, EMERGENCY merah, PROACTIVE oranye, COMMAND hijau."*
+> *"Bagian ketiga adalah log aktivitas di sisi kanan. Setiap kali ada pesan WebSocket masuk — apapun jenisnya — langsung muncul di log ini dengan warna berbeda: biru untuk data traffic, merah untuk darurat, oranye untuk notifikasi dari server, hijau untuk hasil perintah."*
 
 **📍 Kode:**
 ```
@@ -225,19 +225,19 @@ function logActivity(label, message, level = 'info') {
   setTimeout(() => { item.style.backgroundColor = ''; }, 1000);
 }
 ```
-> 💡 **Kesimpulan Inti:** Activity Log adalah bukti nyata aliran data real-time — setiap event WebSocket yang masuk, apapun jenisnya, selalu tercatat di sini dengan timestamp dan warna berbeda per kategori. Ini yang membedakan sistem event-driven dari polling biasa.
+> 💡 **Kesimpulan Inti:** Log ini adalah bukti bahwa data mengalir terus secara real-time. Setiap kali ada pesan masuk lewat WebSocket, langsung tercatat di sini dengan warna yang berbeda sesuai jenisnya — jauh lebih efisien dibanding website biasa yang harus refresh untuk tahu ada data baru.
 
 ---
 
 ### 📡 FITUR 3: Server-Initiated Events
 
-> *"Server mendorong data ke browser TANPA ada request dari klien. Ada dua mekanisme."*
+> *"Fitur ketiga adalah server yang mengirim data ke browser TANPA menunggu browser minta. Ada dua cara server melakukan ini."*
 
 **[Tunggu KPI bar update sendiri, lalu tunjukkan toast muncul]**
 
-> *"Mekanisme pertama: System Heartbeat — setiap 15 detik, server push ringkasan kondisi kota ke semua browser. KPI bar atas (Intersections, Congested, Alerts, AQI) diupdate dari sini tanpa browser minta."*
+> *"Cara pertama: setiap 15 detik, server otomatis mengirim ringkasan kondisi kota ke semua browser yang terhubung. Lihat bagian atas layar — angka jumlah persimpangan, yang macet, jumlah alert, dan nilai kualitas udara berubah sendiri tanpa kita minta."*
 
-> *"Mekanisme kedua: saat gRPC stream menerima emergency event severity HIGH atau CRITICAL, Bridge langsung push `server_alert` khusus — toast notifikasi muncul otomatis."*
+> *"Cara kedua: kalau ada kejadian darurat dengan tingkat HIGH atau CRITICAL yang masuk dari gRPC, server langsung meneruskan notifikasi khusus ke browser. Lihat — muncul popup di pojok kanan atas secara otomatis, padahal kita tidak klik apapun."*
 
 **📍 Kode — Heartbeat (proactive push tiap 15 detik):**
 ```
@@ -267,7 +267,7 @@ function startServerPush(wss) {
   }, 15000);   // ← 15 detik, tanpa diminta
 }
 ```
-> 💡 **Kesimpulan Inti:** `startServerPush()` adalah implementasi **Server-Initiated Events** yang murni — server yang berinisiatif kirim data ke browser menggunakan `setInterval`, bukan karena ada request. Browser hanya duduk dan menerima.
+> 💡 **Kesimpulan Inti:** Fungsi `startServerPush()` berjalan seperti jam alarm — setiap 15 detik dia bangun dan kirim laporan kondisi kota ke semua browser. Tidak ada yang memintanya, server yang memulai sendiri. Inilah yang disebut Server-Initiated Events.
 
 **📍 Kode — Proactive alert saat gRPC emergency stream:**
 ```
@@ -289,7 +289,7 @@ emergencyStream.on('data', (event) => {
   }
 });
 ```
-> 💡 **Kesimpulan Inti:** Ini adalah "double push" — saat event darurat HIGH/CRITICAL datang dari gRPC stream, Bridge tidak hanya meneruskan event biasa tapi juga mengirim `server_alert` tambahan secara proaktif. Server yang memutuskan kapan browser perlu diberi tahu.
+> 💡 **Kesimpulan Inti:** Saat ada kejadian darurat serius, server tidak hanya meneruskan data biasa — ia juga langsung mengirim notifikasi ekstra ke browser. Ibarat walkie-talkie yang tidak hanya meneruskan informasi tapi juga membunyikan sirene kalau situasinya gawat.
 
 **📍 Kode — Handler di browser:**
 ```
@@ -310,21 +310,21 @@ case 'system_heartbeat': {                             // Baris 142
   document.getElementById('kpi-aqi-val').textContent = hb.avg_aqi;
 }
 ```
-> 💡 **Kesimpulan Inti:** `server_alert` dan `system_heartbeat` adalah dua tipe pesan yang **100% diprakarsai server** — browser di sisi client tidak pernah meminta data ini, semua inisiatif ada di server. Ini adalah inti perbedaan WebSocket dari HTTP biasa.
+> 💡 **Kesimpulan Inti:** Pesan `server_alert` dan `system_heartbeat` adalah dua contoh data yang seluruhnya diprakarsai server — browser tidak pernah memintanya. Ini beda dengan website biasa di mana browser harus terus polling (tanya berulang) untuk tahu ada data baru.
 
 ---
 
 ### 🕹️ FITUR 4: Command & Control Bridge
 
-> *"Browser kirim instruksi via WebSocket → Bridge terima → panggil gRPC → hasilnya balik ke browser."*
+> *"Fitur terakhir: browser bisa mengirim perintah lewat WebSocket, dan perintah itu otomatis dijalankan sebagai panggilan gRPC di server."*
 
 **[Scroll ke Command Center, demo update lampu + buat alert]**
 
 **Demo 1 — Pilih INT-001, set RED, klik UPDATE:**
-> *"Browser kirim JSON `{ command: 'update_traffic_light', params: {...} }` via WebSocket. Bridge terima, panggil gRPC `UpdateTrafficLight`, hasilnya di-send balik ke browser. Grid intersection langsung update."*
+> *"Kita coba pilih persimpangan INT-001, ganti lampunya jadi merah, lalu klik UPDATE. Yang terjadi adalah: browser kirim pesan lewat WebSocket ke Bridge, Bridge langsung panggil fungsi gRPC `UpdateTrafficLight` di server, server ubah data, data yang berubah mengalir balik ke browser lewat gRPC stream dan WebSocket, lalu tampilan lampu di daftar langsung berubah jadi merah. Semua ini terjadi dalam hitungan milidetik tanpa reload halaman."*
 
 **Demo 2 — Tab Emergency, create FIRE CRITICAL, klik CREATE:**
-> *"Alert muncul di Emergency Queue. Karena CRITICAL, server_alert proaktif juga muncul. Klik RESOLVE — alert hilang, unit kembali AVAILABLE."*
+> *"Sekarang kita coba buat alert darurat: pilih tipe FIRE, tingkat CRITICAL, lokasi isi bebas, lalu klik CREATE. Alert langsung muncul di bagian Emergency. Karena tingkatnya CRITICAL, server juga langsung kirim notifikasi popup otomatis. Kalau kita klik RESOLVE, alert hilang dan unit yang ditugaskan kembali ke status tersedia."*
 
 **📍 Kode — Kirim command dari browser:**
 ```
@@ -337,6 +337,7 @@ function sendCommand(command, params = {}) {
   setCmdOutput(`▶ Uplink: ${command.toUpperCase()}`, '');
 }
 ```
+> 💡 **Kesimpulan Inti:** Cukup satu fungsi `sendCommand()` untuk semua jenis perintah. Browser tidak perlu tahu apapun tentang gRPC — cukup kirim pesan JSON sederhana lewat WebSocket, dan Bridge yang mengurus sisanya.
 
 ```
 📄 web/app.js — Baris 590–597 (event listener tombol)
@@ -352,6 +353,7 @@ document.getElementById('btn-update-light').addEventListener('click', () => {
   });
 });
 ```
+> 💡 **Kesimpulan Inti:** Tombol di layar hanya mengambil nilai dari form lalu memanggil `sendCommand()`. Tidak ada logika rumit di browser — semua proses terjadi di server.
 
 **📍 Kode — Bridge terima command → panggil gRPC:**
 ```
@@ -387,6 +389,7 @@ function handleClientCommand(ws, wss, raw) {
   }
 }
 ```
+> 💡 **Kesimpulan Inti:** `handleClientCommand()` adalah penerjemah antara WebSocket dan gRPC. Ia menerima pesan sederhana dari browser, mencari tahu gRPC mana yang harus dipanggil, menjalankannya, lalu mengirim hasilnya kembali ke browser. Browser tidak pernah bersentuhan langsung dengan gRPC.
 
 **📍 Kode — gRPC service handler di backend:**
 ```
@@ -405,6 +408,7 @@ UpdateTrafficLight(call, callback) {
   callback(null, { success: true, previous_light: result.previousLight, ... }); // Baris 78
 }
 ```
+> 💡 **Kesimpulan Inti:** Handler gRPC bertugas memeriksa apakah data yang dikirim sudah benar (validasi), baru kemudian menyimpannya ke store dan mengembalikan jawaban. Kodenya bersih karena tidak ada urusan dengan WebSocket sama sekali.
 
 **📍 Kode — Store update + emit event (trigger stream):**
 ```
@@ -424,6 +428,7 @@ updateTrafficLight(id, newLight, durationSeconds, reason) {
   });
 }
 ```
+> 💡 **Kesimpulan Inti:** `this.emit()` di store adalah titik pertama yang memulai seluruh aliran data. Satu baris ini memicu rangkaian panjang: data berubah → TrafficService kirim ke gRPC stream → Bridge sebar ke WebSocket → browser update tampilannya.
 
 ```
 📄 server/services/trafficService.js — Baris 225–236 (stream listener)
@@ -435,6 +440,7 @@ const onUpdate = (update) => {
 };
 store.on('traffic_update', onUpdate);  // Baris 236
 ```
+> 💡 **Kesimpulan Inti:** `call.write()` adalah cara gRPC mendorong data ke stream. Setiap kali store memberitahu ada perubahan, fungsi ini langsung mengirim data itu ke Bridge, yang kemudian meneruskannya ke semua browser. Alur lengkapnya: Store → gRPC → Bridge → WebSocket → Browser.
 
 ---
 
@@ -462,6 +468,7 @@ service EmergencyService {
   rpc SubscribeAlerts (SubscribeRequest) returns (stream EmergencyEvent); // Baris 40: Streaming
 }
 ```
+> 💡 **Kesimpulan Inti:** File `.proto` adalah perjanjian tertulis antara server dan client gRPC — mendefinisikan fungsi apa saja yang tersedia beserta input dan outputnya. Kata kunci `stream` di depan return type berarti server akan terus-menerus mengirim data, bukan hanya sekali. Streaming inilah yang jadi sumber data real-time untuk WebSocket.
 
 ### 2. InMemoryStore — Event Source
 ```
@@ -491,6 +498,7 @@ class InMemoryStore extends EventEmitter {
   }
 }
 ```
+> 💡 **Kesimpulan Inti:** InMemoryStore menyimpan semua data sekaligus berperan sebagai sistem pengumuman internal. Setiap kali ada data yang berubah, store langsung memberi tahu semua pihak lewat event. Hebatnya, satu insiden traffic berat otomatis bisa memicu pembuatan alert darurat tanpa ada yang memintanya — ini yang disebut cross-service orchestration.
 
 ### 3. websocketBridge.js — Inti Integrasi
 ```
@@ -506,6 +514,7 @@ function broadcast(wss, type, data) {
   });
 }
 ```
+> 💡 **Kesimpulan Inti:** Fungsi `broadcast()` seperti pengeras suara — satu pesan dari gRPC langsung disebarkan ke semua browser yang sedang terhubung sekaligus. Tidak peduli ada 1 atau 10 browser yang buka dashboard, semuanya dapat data yang sama pada waktu yang sama.
 
 ```
 📄 server/websocketBridge.js — Baris 50–102 (gRPC → WS)
@@ -534,6 +543,7 @@ function startGrpcStreams(wss) {
   }, 4000);
 }
 ```
+> 💡 **Kesimpulan Inti:** `startGrpcStreams()` adalah tempat semua stream gRPC disambungkan ke WebSocket. Tiga layanan gRPC langsung didengarkan sekaligus saat server pertama kali nyala. Satu koneksi gRPC bisa melayani berapapun jumlah browser yang terhubung.
 
 ### 4. web/app.js — Event Router Browser
 ```
@@ -554,22 +564,23 @@ function handleMessage(msg) {
   }
 }
 ```
+> 💡 **Kesimpulan Inti:** `handleMessage()` adalah tempat browser memutuskan apa yang harus dilakukan saat ada pesan masuk. Setiap jenis pesan punya jalur sendiri menuju fungsi render yang sesuai. Inilah yang membuat tampilan bisa berubah otomatis tanpa perlu refresh halaman.
 
 ---
 
 ## 🎙️ PENUTUP (30 detik)
 
-> *"Untuk merangkum, NovaPulse mengimplementasikan keempat requirement Week 9:*
+> *"Jadi kesimpulannya, proyek NovaPulse sudah memenuhi keempat requirement Week 9:*
 >
-> *✅ WebSocket Implementation — gRPC stream di-bridge ke WebSocket, data mengalir otomatis (`websocketBridge.js` baris 50–102)*
+> *✅ WebSocket Implementation — data dari gRPC streaming langsung diteruskan ke browser lewat WebSocket secara otomatis (lihat `websocketBridge.js` baris 50–102)*
 >
-> *✅ Event-Driven UI — 3 komponen dinamis: Chart (baris 186), Grid (baris 270), Log (baris 298) di `web/app.js`*
+> *✅ Event-Driven UI — tiga bagian tampilan berubah secara dinamis: grafik (baris 186), daftar persimpangan (baris 270), dan log aktivitas (baris 298) di `web/app.js`*
 >
-> *✅ Server-Initiated Events — Heartbeat 15 detik (`websocketBridge.js` baris 119) + proactive alert (baris 74)*
+> *✅ Server-Initiated Events — server mengirim heartbeat setiap 15 detik dan notifikasi darurat secara proaktif tanpa diminta browser (lihat `websocketBridge.js` baris 119 dan 74)*
 >
-> *✅ Command & Control Bridge — Browser → WebSocket → gRPC (`websocketBridge.js` baris 156–303)*
+> *✅ Command & Control Bridge — perintah dari browser dikirim lewat WebSocket lalu dieksekusi sebagai panggilan gRPC di server (lihat `websocketBridge.js` baris 156–303)*
 >
-> *Terima kasih."*
+> *Terima kasih sudah menonton."*
 
 ---
 
