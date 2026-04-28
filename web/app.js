@@ -15,6 +15,20 @@ const state = {
   units:         {},   // id → data
   totalAlerts:   0,    // notification counter
   notifications: [],   // persistent history
+  map:           null, // Leaflet instance
+  markers:       {},   // id → Marker instance
+};
+
+// ── Default Coordinates (Jakarta) ─────────────────────────────────────────────
+const COORDINATES = {
+  'INT-001': [-6.2088, 106.8456],
+  'INT-002': [-6.2297, 106.8372],
+  'INT-003': [-6.1954, 106.8231],
+  'INT-004': [-6.1481, 106.8298],
+  'INT-005': [-6.2250, 106.8100],
+  'INT-006': [-6.1500, 106.8350],
+  'INT-007': [-6.2615, 106.8106],
+  'INT-008': [-6.2146, 106.8451],
 };
 
 // ── WebSocket Setup ───────────────────────────────────────────────────────────
@@ -75,6 +89,7 @@ function handleMessage(msg) {
       renderAll();
       populateSelects();
       logActivity('SYSTEM', `State synchronized: ${Object.keys(state.intersections).length} nodes mapped`, 'system');
+      updateMapMarkers();
       break;
 
     // ── Traffic Updates (Component 1 & 2) ───────────────────────────────────
@@ -88,6 +103,7 @@ function handleMessage(msg) {
       }
       renderTrafficChart();
       renderIntersections();
+      updateMapMarkers();
       const level = u.event_type === 'INCIDENT' ? 'warning' : 'info';
       logActivity('TRAFFIC', `[${u.event_type}] ${u.name || u.intersection_id}: ${u.details}`, level);
       break;
@@ -99,7 +115,7 @@ function handleMessage(msg) {
       logActivity('EMERGENCY', `🚨 [${ev.event_type}] ${ev.alert_type} in ${ev.zone}`, 'error');
       
       if (ev.event_type === 'NEW_ALERT') {
-        state.alerts.push({
+        const newAlert = {
           alert_id: ev.alert_id,
           type: ev.alert_type,
           severity: ev.severity,
@@ -107,15 +123,24 @@ function handleMessage(msg) {
           zone: ev.zone,
           description: ev.description,
           status: 'PENDING',
-        });
+          latitude: ev.latitude || COORDINATES['INT-001'][0],
+          longitude: ev.longitude || COORDINATES['INT-001'][1],
+        };
+        state.alerts.push(newAlert);
         showToast(`🚨 NEW ${ev.severity} ALERT`, `${ev.alert_type} at ${ev.location}`, ev.description, ev.severity);
         if (ev.severity === 'CRITICAL' || ev.severity === 'HIGH') playAlertSound();
+        
+        // Fly to alert on map
+        if (state.map && newAlert.latitude && newAlert.longitude) {
+          state.map.flyTo([newAlert.latitude, newAlert.longitude], 15, { animate: true, duration: 2 });
+        }
       } else if (ev.event_type === 'ALERT_RESOLVED') {
         state.alerts = state.alerts.filter(a => a.alert_id !== ev.alert_id);
         showToast('✅ ALERT RESOLVED', `${ev.alert_type} at ${ev.location}`, 'Situation normalized', 'INFO');
       }
       renderEmergencyAlerts();
       updateKpis();
+      updateMapMarkers();
       break;
     }
 
@@ -124,6 +149,7 @@ function handleMessage(msg) {
       (msg.data.sensors || []).forEach(s => { state.sensors[s.sensor_id] = s; });
       renderSensors();
       updateKpis();
+      updateMapMarkers();
       break;
     }
 
@@ -420,6 +446,154 @@ function renderEmergencyAlerts() {
     </div>`}).join('');
 }
 
+/** COMPONENT: Live Map */
+function initMap() {
+  const container = document.getElementById('map-container');
+  if (!container || state.map) return;
+
+  // Initialize Leaflet map
+  state.map = L.map('map-container', {
+    center: [-6.2088, 106.8456],
+    zoom: 13,
+    zoomControl: false,
+    attributionControl: false
+  });
+
+  // Select tiles based on current theme
+  const theme = document.documentElement.getAttribute('data-theme') || 'light';
+  const tileUrl = theme === 'dark' 
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
+  L.tileLayer(tileUrl, {
+    maxZoom: 19
+  }).addTo(state.map);
+
+  L.control.zoom({ position: 'bottomright' }).addTo(state.map);
+  
+  logActivity('SYSTEM', 'Geospatial Intelligence Engine initialized', 'system');
+}
+
+function updateMapMarkers() {
+  if (!state.map) return;
+
+  // 1. Nodes (Intersections) — cyan circleMarker
+  Object.values(state.intersections).forEach(i => {
+    const lat = i.latitude || i.lat;
+    const lng = i.longitude || i.lng;
+    if (!lat || isNaN(lat)) return;
+    
+    const markerId = `int-${i.intersection_id}`;
+    
+    if (!state.markers[markerId]) {
+      state.markers[markerId] = L.circleMarker([lat, lng], {
+        radius: 6,
+        color: '#ffffff',
+        fillColor: '#0ea5e9',
+        fillOpacity: 1,
+        weight: 2,
+      }).addTo(state.map);
+    }
+    
+    const status = i.congestion_level > 0.7 ? '<span style="color:#ef4444">CRITICAL</span>' : 'OPTIMAL';
+    state.markers[markerId].bindPopup(`
+      <div style="font-family:var(--font); padding: 5px;">
+        <strong style="display:block; margin-bottom:5px;">${i.name}</strong>
+        <div style="font-size:0.75rem; color:var(--text-muted)">
+          Node ID: ${i.intersection_id}<br>
+          Signal: ${i.current_light}<br>
+          Congestion: ${Math.round(i.congestion_level * 100)}%<br>
+          Status: ${status}
+        </div>
+      </div>
+    `);
+  });
+
+  // 2. Sensors — purple circleMarker
+  Object.values(state.sensors).forEach(s => {
+    const lat = s.latitude || s.lat;
+    const lng = s.longitude || s.lng;
+    const markerId = `sns-${s.sensor_id}`;
+    
+    if (!lat || lat === 0 || isNaN(lat)) return;
+
+    if (!state.markers[markerId]) {
+      state.markers[markerId] = L.circleMarker([lat, lng], {
+        radius: 5,
+        color: '#ffffff',
+        fillColor: '#a855f7',
+        fillOpacity: 1,
+        weight: 2,
+      }).addTo(state.map);
+    }
+    
+    state.markers[markerId].bindPopup(`
+      <div style="font-family:var(--font); padding: 5px;">
+        <strong style="display:block; margin-bottom:5px;">${s.name}</strong>
+        <div style="font-size:0.75rem; color:var(--text-muted)">
+          Type: ${s.type.replace('_', ' ')}<br>
+          Value: ${s.value}${s.unit}<br>
+          Quality: ${s.quality_level}
+        </div>
+      </div>
+    `);
+  });
+
+  // 3. Incidents/Alerts — red circleMarker + pulsing halo
+  state.alerts.forEach(a => {
+    const markerId = `alert-${a.alert_id}`;
+    if (a.status === 'RESOLVED') {
+      if (state.markers[markerId]) {
+        state.map.removeLayer(state.markers[markerId]);
+        delete state.markers[markerId];
+      }
+      if (state.markers[markerId + '-halo']) {
+        state.map.removeLayer(state.markers[markerId + '-halo']);
+        delete state.markers[markerId + '-halo'];
+      }
+      return;
+    }
+
+    const lat = a.latitude;
+    const lng = a.longitude;
+    if (!lat || lat === 0 || isNaN(lat)) return;
+
+    if (!state.markers[markerId]) {
+      // Halo (pulsing ring)
+      state.markers[markerId + '-halo'] = L.circleMarker([lat, lng], {
+        radius: 20,
+        color: '#ef4444',
+        fillColor: '#ef4444',
+        fillOpacity: 0.12,
+        weight: 2,
+        opacity: 0.4,
+        className: 'incident-halo-pulse',
+      }).addTo(state.map);
+
+      // Core dot
+      state.markers[markerId] = L.circleMarker([lat, lng], {
+        radius: 7,
+        color: '#ffffff',
+        fillColor: '#ef4444',
+        fillOpacity: 1,
+        weight: 2,
+      }).addTo(state.map);
+    }
+    
+    state.markers[markerId].bindPopup(`
+      <div style="font-family:var(--font); padding: 5px;">
+        <strong style="display:block; color:#ef4444; margin-bottom:5px;">🚨 ${a.type}</strong>
+        <div style="font-size:0.75rem; color:var(--text-muted)">
+          Severity: ${a.severity}<br>
+          Location: ${a.location}<br>
+          ${a.description}
+        </div>
+      </div>
+    `);
+  });
+}
+
+
 /** KPI UPDATES */
 function updateKpis() {
   // Heartbeat handles main KPI values
@@ -532,10 +706,12 @@ function renderNotifications() {
 }
 
 function renderAll() {
+  initMap();
   renderTrafficChart();
   renderIntersections();
   renderSensors();
   renderEmergencyAlerts();
+  updateMapMarkers();
 }
 
 function escHtml(str) {
@@ -562,6 +738,22 @@ function initTheme() {
     } else {
       themeIcon.innerHTML = '<use href="#icon-moon"></use>';
     }
+    
+    // Switch Map Tiles
+    if (state.map) {
+      const tileUrl = theme === 'dark' 
+        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+      
+      // Remove old layers
+      state.map.eachLayer(layer => {
+        if (layer instanceof L.TileLayer) state.map.removeLayer(layer);
+      });
+      
+      // Add new layer
+      L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(state.map);
+    }
+
     renderTrafficChart();
   };
 

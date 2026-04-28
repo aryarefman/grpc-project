@@ -22,12 +22,19 @@
   --primary:       #000000;
   --primary-fg:    #ffffff;
   --cyan:          #0284c7;
+  --cyan-rgb:      2, 132, 199;
   --blue:          #2563eb;
+  --blue-rgb:      37, 99, 235;
   --purple:        #7c3aed;
+  --purple-rgb:    124, 58, 237;
   --green:         #10b981;
+  --green-rgb:     16, 185, 129;
   --yellow:        #d97706;
+  --yellow-rgb:    217, 119, 6;
   --red:           #ef4444;
+  --red-rgb:       239, 68, 68;
   --orange:        #f97316;
+  --orange-rgb:    249, 115, 22;
 
   --shadow-sm:     0 1px 2px rgba(0,0,0,0.04);
   --shadow-md:     0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
@@ -58,12 +65,19 @@
   --primary:       #ffffff;
   --primary-fg:    #000000;
   --cyan:          #38bdf8;
+  --cyan-rgb:      56, 189, 248;
   --blue:          #60a5fa;
+  --blue-rgb:      96, 165, 250;
   --purple:        #a78bfa;
+  --purple-rgb:    167, 139, 250;
   --green:         #34d399;
+  --green-rgb:     52, 211, 153;
   --yellow:        #fbbf24;
+  --yellow-rgb:    251, 191, 36;
   --red:           #f87171;
+  --red-rgb:       248, 113, 113;
   --orange:        #fb923c;
+  --orange-rgb:    251, 146, 60;
 
   --shadow-sm:     0 1px 2px rgba(0,0,0,0.4);
   --shadow-md:     0 4px 6px -1px rgba(0,0,0,0.5);
@@ -118,7 +132,7 @@ body::after {
   content: '';
   position: fixed;
   inset: 0;
-  background: url('https://grainy-gradients.vercel.app/noise.svg');
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
   opacity: 0.04;
   pointer-events: none;
   z-index: 10000;
@@ -264,8 +278,21 @@ body::after {
 
 /* ── Main Grid ─────────────────────────────────────────────────────────────── */
 .main-grid {
-  display: grid; grid-template-columns: 1fr 1fr 400px; gap: 24px;
-  padding: 0 32px 40px; max-width: 1464px; margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr 400px;
+  gap: 24px;
+  padding: 0 32px 40px;
+  max-width: 1464px;
+  margin: 0 auto;
+}
+@media (max-width: 1400px) {
+  .main-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 1024px) {
+  .main-grid { gap: 16px; padding: 0 20px 32px; }
+}
+@media (max-width: 800px) {
+  .main-grid { grid-template-columns: 1fr; }
 }
 
 /* ── Cards ─────────────────────────────────────────────────────────────────── */
@@ -279,7 +306,7 @@ body::after {
 }
 .card:hover { 
   border-color: var(--border-bright); 
-  box-shadow: var(--shadow-lg), 0 0 20px rgba(var(--cyan-rgb, 6, 182, 212), 0.05);
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(var(--cyan-rgb), 0.05);
   transform: translateY(-4px);
 }
 .card::before {
@@ -291,12 +318,27 @@ body::after {
   box-shadow: var(--shadow-lg), 0 0 30px rgba(0, 0, 0, 0.5);
 }
 
-.card-chart     { grid-column: 1 / 3; }
-.card-status    { grid-column: 3; }
-.card-log       { grid-column: 1; }
-.card-sensors   { grid-column: 2; }
-.card-emergency { grid-column: 3; }
-.card-command   { grid-column: 1 / 4; }
+.card-chart     { grid-column: span 2; }
+.card-map       { grid-column: 1 / -1; min-height: 500px; margin-bottom: 8px; }
+.card-status    { grid-column: span 1; }
+.card-log       { grid-column: span 1; }
+.card-sensors   { grid-column: span 1; }
+.card-emergency { grid-column: span 1; }
+.card-command   { grid-column: 1 / -1; }
+
+@media (max-width: 1400px) {
+  .card-chart { grid-column: span 2; }
+  .card-map { grid-column: span 2; }
+  .card-status { grid-column: span 2; }
+  .card-log, .card-sensors { grid-column: span 1; }
+  .card-emergency { grid-column: span 2; }
+}
+
+@media (max-width: 800px) {
+  .card-chart, .card-status, .card-log, .card-sensors, .card-emergency, .card-command { 
+    grid-column: span 1; 
+  }
+}
 
 .card-header { display: flex; align-items: center; justify-content: space-between; }
 .card-title-group { display: flex; align-items: center; gap: 8px; color: var(--text-main); }
@@ -325,7 +367,105 @@ canvas#traffic-chart { width: 100%; height: 220px; }
 .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
 .dot-cyan   { background: var(--cyan); }
 .dot-yellow { background: var(--yellow); }
+.dot-purple { background: var(--purple); }
 .dot-red    { background: var(--red); }
+
+/* ── Live Map ─────────────────────────────────────────────────────────────── */
+.map-container {
+  width: 100%;
+  flex: 1;
+  min-height: 300px;
+  background: var(--bg-surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.map-legend {
+  display: flex;
+  gap: 20px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-top: -5px;
+  background: var(--bg-surface);
+  padding: 8px 16px;
+  border-radius: 99px;
+  width: fit-content;
+  border: 1px solid var(--border-bright);
+  box-shadow: var(--shadow-md);
+  z-index: 100;
+}
+
+/* Leaflet Customization */
+.leaflet-container {
+  background: var(--bg-surface) !important;
+  font-family: var(--font) !important;
+}
+
+[data-theme="dark"] .leaflet-tile-pane {
+  /* Subtle adjustment instead of aggressive inversion */
+  filter: saturate(0.8) brightness(0.8);
+}
+
+.leaflet-popup-content-wrapper {
+  background: var(--bg-thick-glass) !important;
+  backdrop-filter: blur(12px);
+  color: var(--text-main) !important;
+  border-radius: var(--radius) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.leaflet-popup-tip {
+  background: var(--bg-thick-glass) !important;
+}
+
+.leaflet-bar a {
+  background: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border) !important;
+}
+
+/* Marker Glows */
+.map-marker-node {
+  background: var(--cyan);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--cyan);
+}
+
+.map-marker-sensor {
+  background: var(--purple);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--purple);
+}
+
+.map-marker-incident {
+  background: var(--red);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 15px var(--red);
+  animation: marker-pulse 1.5s infinite;
+}
+
+@keyframes marker-pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Incident halo pulse (SVG circleMarker) */
+.incident-halo-pulse {
+  animation: halo-pulse 2s ease-in-out infinite;
+}
+@keyframes halo-pulse {
+  0%, 100% { opacity: 0.5; stroke-width: 2; }
+  50% { opacity: 0.2; stroke-width: 4; }
+}
 
 /* ── Intersection Grid ─────────────────────────────────────────────────────── */
 .intersection-grid { display: flex; flex-direction: column; gap: 8px; max-height: 350px; overflow-y: auto; padding-right: 8px; }
@@ -445,29 +585,30 @@ canvas#traffic-chart { width: 100%; height: 220px; }
 .form-group { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 6px; }
 .form-group label { font-size: 0.6rem; font-weight: 600; color: var(--text-muted); letter-spacing: 0.02em; text-transform: uppercase; }
 .form-group input, .form-group select {
-  background: var(--bg-base);
-  border: 1px solid var(--border-bright);
+  background: rgba(0, 0, 0, 0.03); 
+  border: 1px solid var(--border-bright); 
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  color: var(--text-main);
-  font-family: var(--font);
-  font-size: 0.8rem;
-  outline: none;
-  transition: all var(--transition);
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
+  padding: 8px 12px; color: var(--text-main); font-family: var(--font); font-size: 0.8rem;
+  outline: none; transition: all var(--transition); 
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.05); 
   height: 38px;
 }
 .form-group input:hover, .form-group select:hover {
   border-color: var(--text-faint);
-  background: var(--bg-surface);
+  background: rgba(0, 0, 0, 0.05);
 }
-.form-group input:focus, .form-group select:focus {
-  border-color: var(--primary);
+.form-group input:focus, .form-group select:focus { 
+  border-color: var(--cyan); 
   background: var(--bg-surface);
-  box-shadow: 0 0 0 3px rgba(0,0,0,0.04), inset 0 1px 2px rgba(0,0,0,0.02);
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1), inset 0 1px 2px rgba(0,0,0,0.02); 
 }
-[data-theme="dark"] .form-group input:focus, [data-theme="dark"] .form-group select:focus {
-  box-shadow: 0 0 0 3px rgba(255,255,255,0.08), inset 0 1px 2px rgba(0,0,0,0.2);
+[data-theme="dark"] .form-group input, [data-theme="dark"] .form-group select {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: var(--border-bright);
+}
+[data-theme="dark"] .form-group input:focus, [data-theme="dark"] .form-group select:focus { 
+  background: var(--bg-base);
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2); 
 }
 
 .divider { width: 100%; border: none; border-top: 1px solid var(--border); margin: 8px 0; }
@@ -557,14 +698,14 @@ canvas#traffic-chart { width: 100%; height: 220px; }
 ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
 
-/* ── Responsive ────────────────────────────────────────────────────────────── */
-@media (max-width: 1400px) {
-  .main-grid { grid-template-columns: 1fr 1fr; }
-  .card-command { grid-column: 1 / 3; }
-}
-@media (max-width: 900px) {
-  .main-grid { grid-template-columns: 1fr; }
-  .card-chart, .card-status, .card-log, .card-sensors, .card-emergency, .card-command { grid-column: 1; }
-  .topnav-wrapper { padding: 0 16px; }
-  .kpi-strip { padding: 32px 16px 24px; }
+/* Responsive Grid Fixes */
+@media (max-width: 600px) {
+  .sensor-grid { grid-template-columns: 1fr; }
+  .cmd-form-row { flex-direction: column; align-items: stretch; }
+  .form-group { min-width: 100%; }
+  .btn { width: 100%; }
+  .kpi-strip { padding: 24px 12px; gap: 12px; }
+  .kpi-card { min-width: 160px; padding: 12px; }
+  .kpi-value { font-size: 1.2rem; }
+  .card { padding: 16px; }
 }

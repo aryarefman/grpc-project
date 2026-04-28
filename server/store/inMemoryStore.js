@@ -35,20 +35,22 @@ class InMemoryStore extends EventEmitter {
   _seedData() {
     // Seed intersections
     const intersections = [
-      { id: 'INT-001', name: 'Jl. Sudirman × Jl. Thamrin', zone: 'CENTRAL', current_light: 'GREEN', vehicle_count: 45, congestion_level: 0.3 },
-      { id: 'INT-002', name: 'Jl. Gatot Subroto × Jl. Rasuna Said', zone: 'SOUTH', current_light: 'RED', vehicle_count: 120, congestion_level: 0.8 },
-      { id: 'INT-003', name: 'Jl. MH Thamrin × Jl. Kebon Sirih', zone: 'CENTRAL', current_light: 'GREEN', vehicle_count: 30, congestion_level: 0.2 },
-      { id: 'INT-004', name: 'Jl. Ahmad Yani × Jl. Pemuda', zone: 'NORTH', current_light: 'YELLOW', vehicle_count: 85, congestion_level: 0.6 },
-      { id: 'INT-005', name: 'Jl. Diponegoro × Jl. Imam Bonjol', zone: 'WEST', current_light: 'RED', vehicle_count: 95, congestion_level: 0.7 },
-      { id: 'INT-006', name: 'Jl. Mangga Dua × Jl. Gunung Sahari', zone: 'NORTH', current_light: 'GREEN', vehicle_count: 60, congestion_level: 0.4 },
-      { id: 'INT-007', name: 'Jl. Panglima Polim × Jl. Wolter Monginsidi', zone: 'SOUTH', current_light: 'GREEN', vehicle_count: 25, congestion_level: 0.15 },
-      { id: 'INT-008', name: 'Jl. Casablanca × Jl. Prof. Dr. Satrio', zone: 'EAST', current_light: 'RED', vehicle_count: 110, congestion_level: 0.75 },
+      { id: 'INT-001', name: 'Jl. Sudirman × Jl. Thamrin', zone: 'CENTRAL', current_light: 'GREEN', vehicle_count: 45, congestion_level: 0.3, lat: -6.2088, lng: 106.8456 },
+      { id: 'INT-002', name: 'Jl. Gatot Subroto × Jl. Rasuna Said', zone: 'SOUTH', current_light: 'RED', vehicle_count: 120, congestion_level: 0.8, lat: -6.2297, lng: 106.8372 },
+      { id: 'INT-003', name: 'Jl. MH Thamrin × Jl. Kebon Sirih', zone: 'CENTRAL', current_light: 'GREEN', vehicle_count: 30, congestion_level: 0.2, lat: -6.1954, lng: 106.8231 },
+      { id: 'INT-004', name: 'Jl. Ahmad Yani × Jl. Pemuda', zone: 'NORTH', current_light: 'YELLOW', vehicle_count: 85, congestion_level: 0.6, lat: -6.1481, lng: 106.8298 },
+      { id: 'INT-005', name: 'Jl. Diponegoro × Jl. Imam Bonjol', zone: 'WEST', current_light: 'RED', vehicle_count: 95, congestion_level: 0.7, lat: -6.2250, lng: 106.8100 },
+      { id: 'INT-006', name: 'Jl. Mangga Dua × Jl. Gunung Sahari', zone: 'NORTH', current_light: 'GREEN', vehicle_count: 60, congestion_level: 0.4, lat: -6.1500, lng: 106.8350 },
+      { id: 'INT-007', name: 'Jl. Panglima Polim × Jl. Wolter Monginsidi', zone: 'SOUTH', current_light: 'GREEN', vehicle_count: 25, congestion_level: 0.15, lat: -6.2615, lng: 106.8106 },
+      { id: 'INT-008', name: 'Jl. Casablanca × Jl. Prof. Dr. Satrio', zone: 'EAST', current_light: 'RED', vehicle_count: 110, congestion_level: 0.75, lat: -6.2146, lng: 106.8451 },
     ];
 
     intersections.forEach(i => {
       this.intersections.set(i.id, {
         ...i,
         intersection_id: i.id,
+        latitude: i.lat,
+        longitude: i.lng,
         status: i.congestion_level > 0.7 ? 'CONGESTED' : 'NORMAL',
         last_updated: Date.now(),
       });
@@ -297,24 +299,23 @@ class InMemoryStore extends EventEmitter {
       timestamp: Date.now(),
       zone: intersection ? intersection.zone : '',
       status: intersection ? intersection.status : 'BLOCKED',
+      latitude: intersection ? intersection.latitude : 0,
+      longitude: intersection ? intersection.longitude : 0,
     });
 
     // ── CROSS-SERVICE ORCHESTRATION ────────────────────────────────────
-    // Automatically trigger emergency alert for high severity incidents
-    if (data.severity === 'HIGH' || data.severity === 'CRITICAL') {
-      const intersection = this.intersections.get(data.intersection_id);
-      this.createAlert({
-        type: data.type === 'ACCIDENT' ? 'MEDICAL' : 'GENERAL',
-        severity: data.severity,
-        location: intersection ? intersection.name : 'Unknown Intersection',
-        zone: intersection ? intersection.zone : 'ALL',
-        latitude: intersection ? intersection.latitude : 0,
-        longitude: intersection ? intersection.longitude : 0,
-        description: `AUTOMATIC ALERT: ${data.severity} traffic incident (${data.type}) reported at ${intersection ? intersection.name : data.intersection_id}. ${data.description}`,
-        reporter_name: 'CityNexus TrafficSystem',
-        reporter_contact: 'INTERNAL',
-      });
-    }
+    // Automatically trigger emergency alert for ALL traffic incidents
+    this.createAlert({
+      type: data.type === 'ACCIDENT' ? 'MEDICAL' : 'TRAFFIC_ACCIDENT',
+      severity: data.severity,
+      location: intersection ? intersection.name : 'Unknown Intersection',
+      zone: intersection ? intersection.zone : 'ALL',
+      latitude: intersection ? intersection.latitude : 0,
+      longitude: intersection ? intersection.longitude : 0,
+      description: `TRAFFIC INCIDENT (${data.type}) reported at ${intersection ? intersection.name : data.intersection_id}. ${data.description}`,
+      reporter_name: 'CityNexus TrafficSystem',
+      reporter_contact: 'INTERNAL',
+    });
 
     return incident;
   }
@@ -528,14 +529,33 @@ class InMemoryStore extends EventEmitter {
 
   createAlert(data) {
     const id = `ALRT-${uuidv4().substring(0, 8).toUpperCase()}`;
+    
+    // Default coordinates based on zone if not provided
+    let lat = data.latitude || 0;
+    let lng = data.longitude || 0;
+    
+    if (lat === 0 || lng === 0) {
+      const zoneCoords = {
+        'CENTRAL': [-6.2088, 106.8456],
+        'NORTH':   [-6.1481, 106.8298],
+        'SOUTH':   [-6.2615, 106.8106],
+        'EAST':    [-6.2297, 106.8372],
+        'WEST':    [-6.2250, 106.8100],
+      };
+      const coords = zoneCoords[data.zone] || zoneCoords['CENTRAL'];
+      // Add a small random offset so multiple alerts in the same zone don't overlap perfectly
+      lat = coords[0] + (Math.random() - 0.5) * 0.01;
+      lng = coords[1] + (Math.random() - 0.5) * 0.01;
+    }
+
     const alert = {
       alert_id: id,
       type: data.type,
       severity: data.severity,
       location: data.location,
       zone: data.zone,
-      latitude: data.latitude || 0,
-      longitude: data.longitude || 0,
+      latitude: lat,
+      longitude: lng,
       description: data.description,
       reporter_name: data.reporter_name,
       reporter_contact: data.reporter_contact,
@@ -556,6 +576,8 @@ class InMemoryStore extends EventEmitter {
       location: data.location,
       zone: data.zone,
       description: data.description,
+      latitude: alert.latitude,
+      longitude: alert.longitude,
       unit_id: '',
       unit_name: '',
       timestamp: Date.now(),

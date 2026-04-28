@@ -159,4 +159,6 @@ message EmergencyEvent {
   string unit_id = 9;
   string unit_name = 10;
   int64 timestamp = 11;
+  double latitude = 12;
+  double longitude = 13;
 }
