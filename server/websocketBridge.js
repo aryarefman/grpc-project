@@ -122,6 +122,7 @@ function startServerPush(wss) {
     const intersections = store.getAllIntersections();
     const congested = intersections.filter(i => i.congestion_level > 0.7).length;
     const activeAlerts = store.getActiveAlerts();
+    const criticalAlerts = activeAlerts.filter(a => a.severity === 'CRITICAL');
     const sensors = store.getAllSensors();
     const avgAqi = sensors
       .filter(s => s.type === 'AIR_QUALITY')
@@ -130,8 +131,9 @@ function startServerPush(wss) {
     broadcast(wss, 'system_heartbeat', {
       intersections_total: intersections.length,
       congested_count: congested,
-      active_alerts: activeAlerts.length,
+      active_alerts: criticalAlerts.length,
       avg_aqi: Math.round(avgAqi),
+      sensors_total: sensors.filter(s => s.status === 'ONLINE').length,
       server_time: new Date().toISOString(),
     });
 

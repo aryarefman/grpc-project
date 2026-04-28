@@ -81,14 +81,19 @@ function handleMessage(msg) {
   switch (msg.type) {
 
     case 'initial_state':
-      // Sync local state with server snapshot
+      // Sync local state with server snapshot (reset first to prevent duplicates on reconnect)
+      state.intersections = {};
+      state.sensors = {};
+      state.alerts = [];
+      state.units = {};
       (msg.data.intersections || []).forEach(i => { state.intersections[i.intersection_id] = i; });
       (msg.data.sensors       || []).forEach(s => { state.sensors[s.sensor_id] = s; });
       (msg.data.alerts        || []).forEach(a => { state.alerts.push(a); });
       (msg.data.units         || []).forEach(u => { state.units[u.unit_id] = u; });
       renderAll();
       populateSelects();
-      logActivity('SYSTEM', `State synchronized: ${Object.keys(state.intersections).length} nodes mapped`, 'system');
+      updateKpis();
+      logActivity('SYSTEM', `State synchronized: ${Object.keys(state.intersections).length} nodes, ${Object.keys(state.sensors).length} sensors mapped`, 'system');
       updateMapMarkers();
       break;
 
@@ -103,6 +108,7 @@ function handleMessage(msg) {
       }
       renderTrafficChart();
       renderIntersections();
+      updateKpis();
       updateMapMarkers();
       const level = u.event_type === 'INCIDENT' ? 'warning' : 'info';
       logActivity('TRAFFIC', `[${u.event_type}] ${u.name || u.intersection_id}: ${u.details}`, level);
@@ -135,6 +141,8 @@ function handleMessage(msg) {
           state.map.flyTo([newAlert.latitude, newAlert.longitude], 15, { animate: true, duration: 2 });
         }
       } else if (ev.event_type === 'ALERT_RESOLVED') {
+        // Remove map markers for this alert BEFORE removing from state array
+        removeAlertMarkers(ev.alert_id);
         state.alerts = state.alerts.filter(a => a.alert_id !== ev.alert_id);
         showToast('✅ ALERT RESOLVED', `${ev.alert_type} at ${ev.location}`, 'Situation normalized', 'INFO');
       }
@@ -166,13 +174,9 @@ function handleMessage(msg) {
     }
 
     case 'system_heartbeat': {
-      const hb = msg.data;
-      // document.getElementById('server-time').textContent = new Date(hb.server_time).toLocaleTimeString('en-GB');
-      document.getElementById('kpi-intersections-val').textContent = hb.intersections_total;
-      document.getElementById('kpi-congested-val').textContent = hb.congested_count;
-      document.getElementById('kpi-alerts-val').textContent = hb.active_alerts;
-      document.getElementById('kpi-aqi-val').textContent = hb.avg_aqi || '—';
-      colorKpiAqi(hb.avg_aqi);
+      // Heartbeat is a backup — updateKpis() is the primary source of truth
+      // Just trigger a KPI refresh from local state to stay in sync
+      updateKpis();
       break;
     }
 
@@ -363,7 +367,7 @@ function renderSensors() {
     'AIR_QUALITY': 'icon-aqi',
     'TEMPERATURE': 'icon-temp',
     'HUMIDITY': 'icon-humidity',
-    'NOISE_LEVEL': 'icon-noise',
+    'NOISE': 'icon-noise',
     'WATER_QUALITY': 'icon-water'
   };
 
@@ -594,9 +598,39 @@ function updateMapMarkers() {
 }
 
 
-/** KPI UPDATES */
+/** Remove alert markers from map */
+function removeAlertMarkers(alertId) {
+  if (!state.map) return;
+  const markerId = `alert-${alertId}`;
+  if (state.markers[markerId]) {
+    state.map.removeLayer(state.markers[markerId]);
+    delete state.markers[markerId];
+  }
+  if (state.markers[markerId + '-halo']) {
+    state.map.removeLayer(state.markers[markerId + '-halo']);
+    delete state.markers[markerId + '-halo'];
+  }
+}
+
+/** KPI UPDATES — computed from local state */
 function updateKpis() {
-  // Heartbeat handles main KPI values
+  const intersections = Object.values(state.intersections);
+  const sensors = Object.values(state.sensors);
+  const activeAlerts = state.alerts.filter(a => a.status !== 'RESOLVED');
+  const criticalAlerts = activeAlerts.filter(a => a.severity === 'CRITICAL');
+  const congested = intersections.filter(i => (i.congestion_level || 0) > 0.7).length;
+
+  const aqiSensors = sensors.filter(s => s.type === 'AIR_QUALITY');
+  const avgAqi = aqiSensors.length > 0
+    ? Math.round(aqiSensors.reduce((sum, s) => sum + s.value, 0) / aqiSensors.length)
+    : 0;
+
+  document.getElementById('kpi-intersections-val').textContent = intersections.length;
+  document.getElementById('kpi-congested-val').textContent = congested;
+  document.getElementById('kpi-alerts-val').textContent = criticalAlerts.length;
+  document.getElementById('kpi-aqi-val').textContent = avgAqi || '0';
+  document.getElementById('kpi-sensors-val').textContent = sensors.length;
+  colorKpiAqi(avgAqi);
 }
 
 function colorKpiAqi(aqi) {
@@ -616,14 +650,17 @@ function populateSelects() {
     nodes.innerHTML = list.map(i => `<option value="${i.intersection_id}">${i.intersection_id} - ${i.name}</option>`).join('');
   }
   
+  populateUnitSelect();
+}
+
+function populateUnitSelect() {
   const units = document.getElementById('cmd-dispatch-unit');
-  if (units) {
-    const list = Object.values(state.units).filter(u => u.status === 'AVAILABLE');
-    if (list.length === 0) {
-      units.innerHTML = '<option value="">NO ASSETS AVAILABLE</option>';
-    } else {
-      units.innerHTML = list.map(u => `<option value="${u.unit_id}">${u.name} [${u.type}]</option>`).join('');
-    }
+  if (!units) return;
+  const list = Object.values(state.units).filter(u => u.status === 'AVAILABLE');
+  if (list.length === 0) {
+    units.innerHTML = '<option value="">NO ASSETS AVAILABLE</option>';
+  } else {
+    units.innerHTML = list.map(u => `<option value="${u.unit_id}">${u.name} [${u.type}]</option>`).join('');
   }
 }
 

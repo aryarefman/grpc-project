@@ -183,23 +183,27 @@ class InMemoryStore extends EventEmitter {
               details: `Auto-cycle: ${intersection.current_light}`,
               timestamp: Date.now(),
               zone: intersection.zone,
+              latitude: intersection.latitude,
+              longitude: intersection.longitude,
             });
           }
         }
 
         this.intersections.set(randomId, intersection);
-        this.emit('traffic_update', {
-          intersection_id: randomId,
-          name: intersection.name,
-          event_type: 'CONGESTION_UPDATE',
-          current_light: intersection.current_light,
-          vehicle_count: intersection.vehicle_count,
-          congestion_level: intersection.congestion_level,
-          details: `Traffic update at ${intersection.name}`,
-          timestamp: Date.now(),
-          zone: intersection.zone,
-          status: intersection.status,
-        });
+          this.emit('traffic_update', {
+            intersection_id: randomId,
+            name: intersection.name,
+            event_type: 'CONGESTION_UPDATE',
+            current_light: intersection.current_light,
+            vehicle_count: intersection.vehicle_count,
+            congestion_level: intersection.congestion_level,
+            details: `Traffic update at ${intersection.name}`,
+            timestamp: Date.now(),
+            zone: intersection.zone,
+            status: intersection.status,
+            latitude: intersection.latitude,
+            longitude: intersection.longitude,
+          });
       }
     }, 5000);
 
@@ -258,6 +262,8 @@ class InMemoryStore extends EventEmitter {
       timestamp: Date.now(),
       zone: intersection.zone,
       status: intersection.status,
+      latitude: intersection.latitude,
+      longitude: intersection.longitude,
     });
 
     return { previousLight, currentLight: newLight };
