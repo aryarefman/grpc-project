@@ -205,7 +205,7 @@ class InMemoryStore extends EventEmitter {
             longitude: intersection.longitude,
           });
       }
-    }, 5000);
+    }, 200);
 
     // Simulate sensor value changes every 3 seconds
     setInterval(() => {
@@ -221,7 +221,7 @@ class InMemoryStore extends EventEmitter {
         sensor.last_reading_at = Date.now();
         this.sensors.set(randomId, sensor);
       }
-    }, 3000);
+    }, 500);
   }
 
   // ════════════════════════════════════════════════════════════════════════

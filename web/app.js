@@ -232,7 +232,7 @@ function renderTrafficChart() {
   const entries = Object.values(state.intersections);
   if (entries.length === 0) return;
 
-  const pad  = { top: 20, right: 10, bottom: 30, left: 40 };
+  const pad  = { top: 20, right: 10, bottom: 45, left: 40 };
   const chartW = W - pad.left - pad.right;
   const chartH = H - pad.top  - pad.bottom;
   const barW   = Math.max(12, (chartW / entries.length) - 8);
@@ -288,11 +288,19 @@ function renderTrafficChart() {
     ctx.textAlign = 'center';
     ctx.fillText(`${Math.round(cong * 100)}%`, x + barW / 2, y - 8);
 
-    // X-Axis Labels
-    const label = (inter.intersection_id || '').replace('INT-', '');
+    // X-Axis Labels (Two-line road names)
+    const fullName = inter.name || inter.intersection_id || '';
+    const parts = fullName.split(' × ');
+    const line1 = (parts[0] || '').replace('Jl. ', '').substring(0, 10);
+    const line2 = (parts[1] || '').replace('Jl. ', '').substring(0, 10);
+    
     ctx.fillStyle = mutedColor;
+    ctx.font = '8px JetBrains Mono, monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(label, x + barW / 2, H - 10);
+    ctx.fillText(line1, x + barW / 2, H - 22);
+    if (line2) {
+      ctx.fillText(`× ${line2}`, x + barW / 2, H - 10);
+    }
   });
 }
 
@@ -312,12 +320,12 @@ function renderIntersections() {
     const pct     = Math.round(cong * 100);
     const color   = cong > 0.7 ? '#ef4444' : cong > 0.5 ? '#f59e0b' : '#10b981';
     const light   = (i.current_light || 'RED').toUpperCase();
-    const short   = (i.name || i.intersection_id || '').substring(0, 24);
+    const short   = (i.name || i.intersection_id || '');
 
     return `
       <div class="int-row">
         <div class="int-light light-${light}"></div>
-        <div class="int-name">${short}</div>
+        <div class="int-name" title="${i.name}">${short}</div>
         <div class="int-cong-bar"><div class="int-cong-fill" style="width:${pct}%;background:${color}"></div></div>
         <div class="int-vehicles">${i.vehicle_count || 0}V</div>
       </div>`;
