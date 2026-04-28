@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NovaPulse — Smart City Control Center</title>
+  <meta name="description" content="NovaPulse Smart City gRPC Control Center — Real-time traffic, environment, and emergency management powered by WebSocket and gRPC." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ╔══════════════════════════════════╗ -->
+  <!-- ║         TOP NAV BAR             ║ -->
+  <!-- ╚══════════════════════════════════╝ -->
+  <header id="top-nav" class="topnav">
+    <div class="topnav-left">
+      <div class="logo-mark">⚡</div>
+      <div class="logo-text">
+        <span class="logo-main">NovaPulse</span>
+        <span class="logo-sub">Smart City Control Center</span>
+      </div>
+    </div>
+    <div class="topnav-center">
+      <div id="ws-status-dot" class="ws-dot disconnected"></div>
+      <span id="ws-status-label" class="ws-label">Connecting…</span>
+    </div>
+    <div class="topnav-right">
+      <span id="server-time" class="server-time">--:--:--</span>
+      <div id="alert-bell" class="bell-btn" title="Notifications">
+        🔔 <span id="alert-count" class="badge">0</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ╔══════════════════════════════════╗ -->
+  <!-- ║         KPI STRIP               ║ -->
+  <!-- ╚══════════════════════════════════╝ -->
+  <section id="kpi-strip" class="kpi-strip">
+    <div class="kpi-card" id="kpi-intersections">
+      <div class="kpi-icon">🚦</div>
+      <div class="kpi-body">
+        <div class="kpi-value" id="kpi-intersections-val">—</div>
+        <div class="kpi-label">Intersections</div>
+      </div>
+    </div>
+    <div class="kpi-card" id="kpi-congested">
+      <div class="kpi-icon">🔴</div>
+      <div class="kpi-body">
+        <div class="kpi-value" id="kpi-congested-val">—</div>
+        <div class="kpi-label">Congested</div>
+      </div>
+    </div>
+    <div class="kpi-card" id="kpi-alerts">
+      <div class="kpi-icon">🚨</div>
+      <div class="kpi-body">
+        <div class="kpi-value" id="kpi-alerts-val">—</div>
+        <div class="kpi-label">Active Alerts</div>
+      </div>
+    </div>
+    <div class="kpi-card" id="kpi-aqi">
+      <div class="kpi-icon">🌬️</div>
+      <div class="kpi-body">
+        <div class="kpi-value" id="kpi-aqi-val">—</div>
+        <div class="kpi-label">Avg AQI</div>
+      </div>
+    </div>
+    <div class="kpi-card" id="kpi-sensors">
+      <div class="kpi-icon">📡</div>
+      <div class="kpi-body">
+        <div class="kpi-value" id="kpi-sensors-val">—</div>
+        <div class="kpi-label">Sensors Online</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ╔══════════════════════════════════╗ -->
+  <!-- ║          MAIN GRID              ║ -->
+  <!-- ╚══════════════════════════════════╝ -->
+  <main class="main-grid">
+
+    <!-- ── COMPONENT 1: Traffic Chart ─────────────────────────────────────── -->
+    <section class="card card-chart" aria-label="Traffic Congestion Chart">
+      <div class="card-header">
+        <span class="card-title">📊 Live Traffic Congestion</span>
+        <span class="card-badge" id="traffic-badge">STREAMING</span>
+      </div>
+      <canvas id="traffic-chart" width="600" height="220" aria-label="Bar chart of traffic congestion by intersection"></canvas>
+      <div class="chart-legend">
+        <span class="legend-item"><span class="legend-dot" style="background:#22d3ee"></span>Low (&lt;50%)</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>Medium (50–70%)</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span>High (&gt;70%)</span>
+      </div>
+    </section>
+
+    <!-- ── COMPONENT 2: Status Indicator panel ────────────────────────────── -->
+    <section class="card card-status" aria-label="Intersection Status Panel">
+      <div class="card-header">
+        <span class="card-title">🚦 Intersection Status</span>
+        <span class="card-badge live-pulse">LIVE</span>
+      </div>
+      <div id="intersection-grid" class="intersection-grid">
+        <!-- populated by JS -->
+      </div>
+    </section>
+
+    <!-- ── COMPONENT 3: Activity Log panel ───────────────────────────────── -->
+    <section class="card card-log" aria-label="Real-time Activity Log">
+      <div class="card-header">
+        <span class="card-title">📋 Activity Log</span>
+        <button id="clear-log-btn" class="btn btn-ghost btn-sm">Clear</button>
+      </div>
+      <div id="activity-log" class="activity-log" role="log" aria-live="polite" aria-label="Activity log entries">
+        <div class="log-entry log-info">
+          <span class="log-ts">--:--:--</span>
+          <span class="log-label">SYSTEM</span>
+          <span class="log-msg">Waiting for WebSocket connection…</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Sensor Grid ────────────────────────────────────────────────────── -->
+    <section class="card card-sensors" aria-label="Environment Sensors">
+      <div class="card-header">
+        <span class="card-title">🌡️ Environment Sensors</span>
+        <span class="card-badge">POLLING</span>
+      </div>
+      <div id="sensor-grid" class="sensor-grid">
+        <!-- populated by JS -->
+      </div>
+    </section>
+
+    <!-- ── Emergency Alerts ───────────────────────────────────────────────── -->
+    <section class="card card-emergency" aria-label="Emergency Alerts">
+      <div class="card-header">
+        <span class="card-title">🚨 Emergency Alerts</span>
+        <span id="alert-count-badge" class="card-badge badge-red">0 ACTIVE</span>
+      </div>
+      <div id="emergency-list" class="emergency-list">
+        <div class="empty-state">No active alerts</div>
+      </div>
+    </section>
+
+    <!-- ── COMMAND & CONTROL BRIDGE ───────────────────────────────────────── -->
+    <section class="card card-command" aria-label="Command and Control Panel">
+      <div class="card-header">
+        <span class="card-title">⚙️ Command & Control Bridge</span>
+        <span class="card-badge badge-purple">gRPC→WebSocket</span>
+      </div>
+
+      <div class="cmd-tabs">
+        <button class="cmd-tab active" id="tab-traffic" data-tab="traffic">Traffic</button>
+        <button class="cmd-tab" id="tab-emergency" data-tab="emergency">Emergency</button>
+      </div>
+
+      <!-- Traffic commands -->
+      <div id="panel-traffic" class="cmd-panel">
+        <div class="form-group">
+          <label for="cmd-intersection-id">Intersection ID</label>
+          <select id="cmd-intersection-id">
+            <option value="">— loading… —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="cmd-light">New Light</label>
+          <select id="cmd-light">
+            <option value="RED">🔴 RED</option>
+            <option value="YELLOW">🟡 YELLOW</option>
+            <option value="GREEN" selected>🟢 GREEN</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="cmd-duration">Duration (seconds)</label>
+          <input id="cmd-duration" type="number" min="10" max="3600" value="60" />
+        </div>
+        <div class="form-group">
+          <label for="cmd-reason">Reason</label>
+          <input id="cmd-reason" type="text" placeholder="WebUI Override" />
+        </div>
+        <button id="btn-update-light" class="btn btn-primary" type="button">
+          🚦 Update Traffic Light → gRPC
+        </button>
+        <hr class="divider" />
+        <div class="form-group">
+          <label for="cmd-incident-type">Incident Type</label>
+          <select id="cmd-incident-type">
+            <option value="ACCIDENT">ACCIDENT</option>
+            <option value="CONSTRUCTION">CONSTRUCTION</option>
+            <option value="FLOOD">FLOOD</option>
+            <option value="BREAKDOWN">BREAKDOWN</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="cmd-incident-severity">Severity</label>
+          <select id="cmd-incident-severity">
+            <option value="LOW">LOW</option>
+            <option value="MEDIUM" selected>MEDIUM</option>
+            <option value="HIGH">HIGH</option>
+            <option value="CRITICAL">CRITICAL</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="cmd-incident-desc">Description</label>
+          <input id="cmd-incident-desc" type="text" placeholder="Incident description…" />
+        </div>
+        <button id="btn-report-incident" class="btn btn-warning" type="button">
+          ⚠️ Report Incident → gRPC
+        </button>
+      </div>
+
+      <!-- Emergency commands -->
+      <div id="panel-emergency" class="cmd-panel" style="display:none">
+        <div class="form-group">
+          <label for="cmd-alert-type">Alert Type</label>
+          <select id="cmd-alert-type">
+            <option value="FIRE">FIRE</option>
+            <option value="MEDICAL">MEDICAL</option>
+            <option value="CRIME">CRIME</option>
+            <option value="NATURAL_DISASTER">NATURAL_DISASTER</option>
+            <option value="HAZMAT">HAZMAT</option>
+            <option value="TRAFFIC_ACCIDENT">TRAFFIC_ACCIDENT</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="cmd-alert-severity">Severity</label>
+          <select id="cmd-alert-severity">
+            <option value="LOW">LOW</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="HIGH" selected>HIGH</option>
+            <option value="CRITICAL">CRITICAL</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="cmd-alert-location">Location</label>
+          <input id="cmd-alert-location" type="text" placeholder="e.g. Jl. Sudirman No.1" />
+        </div>
+        <div class="form-group">
+          <label for="cmd-alert-zone">Zone</label>
+          <select id="cmd-alert-zone">
+            <option value="CENTRAL">CENTRAL</option>
+            <option value="NORTH">NORTH</option>
+            <option value="SOUTH">SOUTH</option>
+            <option value="EAST">EAST</option>
+            <option value="WEST">WEST</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="cmd-alert-desc">Description</label>
+          <input id="cmd-alert-desc" type="text" placeholder="Alert description…" />
+        </div>
+        <button id="btn-create-alert" class="btn btn-danger" type="button">
+          🚨 Create Emergency Alert → gRPC
+        </button>
+        <hr class="divider" />
+        <div class="form-group">
+          <label for="cmd-dispatch-alert">Alert ID</label>
+          <input id="cmd-dispatch-alert" type="text" placeholder="ALRT-XXXXXXXX" />
+        </div>
+        <div class="form-group">
+          <label for="cmd-dispatch-unit">Unit ID</label>
+          <select id="cmd-dispatch-unit">
+            <option value="">— loading… —</option>
+          </select>
+        </div>
+        <button id="btn-dispatch-unit" class="btn btn-primary" type="button">
+          🚑 Dispatch Unit → gRPC
+        </button>
+      </div>
+
+      <!-- Command result output -->
+      <div id="cmd-output" class="cmd-output" role="status" aria-live="polite">Ready</div>
+    </section>
+
+  </main>
+
+  <!-- ╔══════════════════════════════════╗ -->
+  <!-- ║      NOTIFICATION TOASTS        ║ -->
+  <!-- ╚══════════════════════════════════╝ -->
+  <div id="toast-container" class="toast-container" aria-live="assertive" aria-label="System notifications"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -6,6 +6,7 @@ const chalk = require('chalk');
 const trafficService = require('./services/trafficService');
 const environmentService = require('./services/environmentService');
 const emergencyService = require('./services/emergencyService');
+const { startWebServer } = require('./webServer');
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
@@ -137,6 +138,9 @@ function startServer() {
         chalk.gray('   ├── npm run client:environment'),
         chalk.gray('   ├── npm run client:emergency'),
         chalk.gray('   └── npm run client:dashboard'),
+        '',
+        chalk.cyan.bold('🌐  Web Dashboard:'),
+        chalk.green('   └── http://localhost:3000'),
       ];
 
       for (const line of lines) {
@@ -151,6 +155,9 @@ function startServer() {
 
       console.log(chalk.blue(botBar));
       console.log('');
+
+      // Start Web + WebSocket server
+      startWebServer();
     })();
   });
 }
