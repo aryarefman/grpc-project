@@ -1,6 +1,10 @@
 # 🧠 NovaPulse - Smart City gRPC Nervous System
 
 # Output
+## Web
+<img width="1428" height="717" alt="image" src="https://github.com/user-attachments/assets/3eda504b-69e0-4e3a-9465-28ab3503b6ad" />
+<img width="1430" height="893" alt="image" src="https://github.com/user-attachments/assets/2c2e8569-c937-4afd-b3b0-bfc74433f733" />
+
 ## Server
 <img width="1482" height="1003" alt="image" src="https://github.com/user-attachments/assets/d6d040e8-1db5-4176-9208-f5010bd2d4dc" />
 
