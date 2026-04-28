@@ -277,6 +277,27 @@ function handleClientCommand(ws, wss, raw) {
       });
       break;
 
+    case 'resolve_alert':
+      emergencyClient.ResolveAlert({
+        alert_id: params.alert_id,
+        resolved_by: params.resolved_by || 'WebUI Operator',
+        resolution_notes: params.notes || 'Resolved via Command Center',
+      }, (err, res) => {
+        if (err) {
+          ws.send(JSON.stringify({ type: 'cmd_error', data: { command, error: err.message } }));
+        } else {
+          ws.send(JSON.stringify({ type: 'cmd_result', data: { command, result: res } }));
+          broadcast(wss, 'server_alert', {
+            title: '✅ Alert Resolved',
+            message: `Alert ${params.alert_id} has been cleared.`,
+            details: params.notes || 'Resolved via Command Center',
+            severity: 'INFO',
+            ts: Date.now(),
+          });
+        }
+      });
+      break;
+
     default:
       ws.send(JSON.stringify({ type: 'cmd_error', data: { command, error: `Unknown command: ${command}` } }));
   }

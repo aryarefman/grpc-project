@@ -1,13 +1,8 @@
 /**
- * NovaPulse — Smart City Control Center
+ * NovaPulse — Smart City Command & Control
  * WebSocket client + Event-Driven UI (3 dynamic components + Command Bridge)
- *
- * Component 1: Live Traffic Congestion Chart (Canvas)
- * Component 2: Intersection Status Indicators (live light + congestion bar)
- * Component 3: Activity Log (auto-scrolling, real-time entries)
- *
- * Extra: Sensor Grid, Emergency Alerts panel, Toast notifications,
- *        Server-Initiated Events, Command & Control Bridge → gRPC
+ * 
+ * DESIGN: Silhouette icons + Premium Cyberpunk Aesthetics
  */
 
 'use strict';
@@ -19,6 +14,7 @@ const state = {
   sensors:       {},   // id → data
   units:         {},   // id → data
   totalAlerts:   0,    // notification counter
+  notifications: [],   // persistent history
 };
 
 // ── WebSocket Setup ───────────────────────────────────────────────────────────
@@ -33,13 +29,13 @@ function connectWS() {
 
   ws.addEventListener('open', () => {
     setWsStatus('connected');
-    logActivity('SYSTEM', 'WebSocket connected to NovaPulse server', 'system');
+    logActivity('SYSTEM', 'Quantum link established with NovaPulse Core', 'system');
     clearTimeout(reconnectTimer);
   });
 
   ws.addEventListener('close', () => {
     setWsStatus('disconnected');
-    logActivity('SYSTEM', 'WebSocket disconnected — reconnecting in 3s…', 'error');
+    logActivity('SYSTEM', 'Link severed — attempting resync in 3s...', 'error');
     reconnectTimer = setTimeout(connectWS, 3000);
   });
 
@@ -52,18 +48,18 @@ function connectWS() {
       const msg = JSON.parse(evt.data);
       handleMessage(msg);
     } catch (e) {
-      console.error('[WS] Parse error:', e);
+      console.error('[WS] Protocol error:', e);
     }
   });
 }
 
 function sendCommand(command, params = {}) {
   if (!ws || ws.readyState !== WebSocket.OPEN) {
-    setCmdOutput('⚠ WebSocket not connected', 'error');
+    setCmdOutput('⚠ OFFLINE: WebSocket link inactive', 'error');
     return;
   }
   ws.send(JSON.stringify({ command, params }));
-  setCmdOutput(`⏳ Sent: ${command}`, '');
+  setCmdOutput(`▶ Uplink: ${command.toUpperCase()}`, '');
 }
 
 // ── Message Router ────────────────────────────────────────────────────────────
@@ -71,17 +67,17 @@ function handleMessage(msg) {
   switch (msg.type) {
 
     case 'initial_state':
-      // Populate all panels from initial snapshot
+      // Sync local state with server snapshot
       (msg.data.intersections || []).forEach(i => { state.intersections[i.intersection_id] = i; });
       (msg.data.sensors       || []).forEach(s => { state.sensors[s.sensor_id] = s; });
       (msg.data.alerts        || []).forEach(a => { state.alerts.push(a); });
       (msg.data.units         || []).forEach(u => { state.units[u.unit_id] = u; });
       renderAll();
       populateSelects();
-      logActivity('SYSTEM', `Initial state loaded: ${Object.keys(state.intersections).length} intersections, ${Object.keys(state.sensors).length} sensors`, 'system');
+      logActivity('SYSTEM', `State synchronized: ${Object.keys(state.intersections).length} nodes mapped`, 'system');
       break;
 
-    // ── Component 1 & 2: Traffic Updates ─────────────────────────────────────
+    // ── Traffic Updates (Component 1 & 2) ───────────────────────────────────
     case 'traffic_update': {
       const u = msg.data;
       if (u.intersection_id) {
@@ -92,17 +88,16 @@ function handleMessage(msg) {
       }
       renderTrafficChart();
       renderIntersections();
-      const icon = u.event_type === 'INCIDENT' ? '⚠️' : u.event_type === 'LIGHT_CHANGE' ? '🚦' : '🚗';
-      const lvl  = u.event_type === 'INCIDENT' ? 'warning' : 'info';
-      logActivity('TRAFFIC', `${icon} ${u.name || u.intersection_id}: ${u.details || u.event_type}`, lvl);
+      const level = u.event_type === 'INCIDENT' ? 'warning' : 'info';
+      logActivity('TRAFFIC', `[${u.event_type}] ${u.name || u.intersection_id}: ${u.details}`, level);
       break;
     }
 
-    // ── Emergency Events ──────────────────────────────────────────────────────
+    // ── Emergency Events ────────────────────────────────────────────────────
     case 'emergency_event': {
       const ev = msg.data;
-      logActivity('EMERGENCY', `🚨 [${ev.event_type}] ${ev.alert_type} @ ${ev.location} — ${ev.severity}`, 'error');
-      // Refresh active alerts list
+      logActivity('EMERGENCY', `🚨 [${ev.event_type}] ${ev.alert_type} in ${ev.zone}`, 'error');
+      
       if (ev.event_type === 'NEW_ALERT') {
         state.alerts.push({
           alert_id: ev.alert_id,
@@ -113,50 +108,55 @@ function handleMessage(msg) {
           description: ev.description,
           status: 'PENDING',
         });
+        showToast(`🚨 NEW ${ev.severity} ALERT`, `${ev.alert_type} at ${ev.location}`, ev.description, ev.severity);
+        if (ev.severity === 'CRITICAL' || ev.severity === 'HIGH') playAlertSound();
       } else if (ev.event_type === 'ALERT_RESOLVED') {
         state.alerts = state.alerts.filter(a => a.alert_id !== ev.alert_id);
+        showToast('✅ ALERT RESOLVED', `${ev.alert_type} at ${ev.location}`, 'Situation normalized', 'INFO');
       }
       renderEmergencyAlerts();
       updateKpis();
       break;
     }
 
-    // ── Component: Sensor Updates ─────────────────────────────────────────────
+    // ── Sensor Updates ────────────────────────────────────────────────────
     case 'sensor_update': {
       (msg.data.sensors || []).forEach(s => { state.sensors[s.sensor_id] = s; });
       renderSensors();
-      const avgAqi = computeAvgAqi();
-      document.getElementById('kpi-aqi-val').textContent = avgAqi > 0 ? avgAqi : '—';
-      colorKpiAqi(avgAqi);
+      updateKpis();
       break;
     }
 
-    // ── Server-Initiated Events ───────────────────────────────────────────────
+    // ── Server-Initiated Proactive Events ──────────────────────────────────
     case 'server_alert': {
       const sa = msg.data;
       showToast(sa.title, sa.message, sa.details, sa.severity || 'INFO');
-      logActivity('SERVER', `📡 ${sa.title}: ${sa.message}`, sa.severity === 'INFO' ? 'success' : 'warning');
+      logActivity('PROACTIVE', `📡 ${sa.title}: ${sa.message}`, sa.severity === 'CRITICAL' ? 'error' : 'warning');
       state.totalAlerts++;
-      document.getElementById('alert-count').textContent = state.totalAlerts;
+      const badge = document.getElementById('alert-count');
+      badge.textContent = state.totalAlerts;
+      badge.style.display = 'flex';
       break;
     }
 
     case 'system_heartbeat': {
       const hb = msg.data;
-      document.getElementById('server-time').textContent = new Date(hb.server_time).toLocaleTimeString();
+      // document.getElementById('server-time').textContent = new Date(hb.server_time).toLocaleTimeString('en-GB');
       document.getElementById('kpi-intersections-val').textContent = hb.intersections_total;
       document.getElementById('kpi-congested-val').textContent = hb.congested_count;
       document.getElementById('kpi-alerts-val').textContent = hb.active_alerts;
       document.getElementById('kpi-aqi-val').textContent = hb.avg_aqi || '—';
+      colorKpiAqi(hb.avg_aqi);
       break;
     }
 
-    // ── Command Results ───────────────────────────────────────────────────────
+    // ── Command Feedback ────────────────────────────────────────────────────
     case 'cmd_result': {
       const r = msg.data;
-      setCmdOutput(`✅ ${r.command}:\n${JSON.stringify(r.result, null, 2)}`, 'success');
-      logActivity('CMD', `✅ ${r.command} succeeded`, 'success');
-      // Update selects if we fetched data
+      setCmdOutput(`✅ EXECUTION SUCCESS: ${r.command.toUpperCase()}`, 'success');
+      logActivity('COMMAND', `Uplink command [${r.command}] confirmed`, 'success');
+      
+      // Secondary state sync if command returned data
       if (r.command === 'list_intersections' && r.result.intersections) {
         r.result.intersections.forEach(i => { state.intersections[i.intersection_id] = i; });
         renderAll(); populateSelects();
@@ -165,29 +165,24 @@ function handleMessage(msg) {
         r.result.units.forEach(u => { state.units[u.unit_id] = u; });
         populateUnitSelect();
       }
-      if (r.command === 'list_active_alerts' && r.result.alerts) {
-        state.alerts = r.result.alerts;
-        renderEmergencyAlerts();
-        updateKpis();
-      }
       break;
     }
 
     case 'cmd_error': {
       const e = msg.data;
-      setCmdOutput(`❌ ${e.command}: ${e.error}`, 'error');
-      logActivity('CMD', `❌ ${e.command} failed: ${e.error}`, 'error');
+      setCmdOutput(`❌ EXECUTION FAILED: ${e.error}`, 'error');
+      logActivity('COMMAND', `Uplink command [${e.command}] rejected: ${e.error}`, 'error');
       break;
     }
 
     default:
-      console.log('[WS] Unknown message type:', msg.type);
+      console.log('[WS] Unknown signal type:', msg.type);
   }
 }
 
-// ── Render Functions ──────────────────────────────────────────────────────────
+// ── Render Logic ──────────────────────────────────────────────────────────────
 
-/** COMPONENT 1: Canvas Bar Chart — Live Traffic Congestion */
+/** COMPONENT 1: High-Performance Canvas Chart */
 function renderTrafficChart() {
   const canvas = document.getElementById('traffic-chart');
   if (!canvas) return;
@@ -196,7 +191,6 @@ function renderTrafficChart() {
   const W      = canvas.clientWidth;
   const H      = canvas.clientHeight;
 
-  // Scale for HiDPI
   if (canvas.width !== W * dpr || canvas.height !== H * dpr) {
     canvas.width  = W * dpr;
     canvas.height = H * dpr;
@@ -208,86 +202,77 @@ function renderTrafficChart() {
   const entries = Object.values(state.intersections);
   if (entries.length === 0) return;
 
-  const pad  = { top: 16, right: 16, bottom: 40, left: 36 };
+  const pad  = { top: 20, right: 10, bottom: 30, left: 40 };
   const chartW = W - pad.left - pad.right;
   const chartH = H - pad.top  - pad.bottom;
-  const barW   = Math.max(8, (chartW / entries.length) - 6);
+  const barW   = Math.max(12, (chartW / entries.length) - 8);
   const gap    = (chartW - barW * entries.length) / (entries.length + 1);
 
-  // Grid lines
-  ctx.strokeStyle = 'rgba(99,118,164,0.12)';
+  const computedStyle = getComputedStyle(document.body);
+  const mutedColor = computedStyle.getPropertyValue('--text-muted').trim() || 'rgba(148, 163, 184, 0.6)';
+  const gridColor = computedStyle.getPropertyValue('--border-bright').trim() || 'rgba(148, 163, 184, 0.15)';
+
+  // Background Grid
+  ctx.strokeStyle = gridColor;
   ctx.lineWidth   = 1;
+  ctx.font        = '10px JetBrains Mono, monospace';
+  ctx.fillStyle   = mutedColor;
+  ctx.textAlign   = 'right';
+
   for (let p = 0; p <= 4; p++) {
     const y = pad.top + chartH * (1 - p / 4);
-    ctx.beginPath();
-    ctx.moveTo(pad.left, y);
-    ctx.lineTo(W - pad.right, y);
-    ctx.stroke();
-    ctx.fillStyle   = 'rgba(148,163,184,0.5)';
-    ctx.font        = '9px Inter, sans-serif';
-    ctx.textAlign   = 'right';
-    ctx.fillText(`${p * 25}%`, pad.left - 4, y + 3);
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    ctx.fillText(`${p * 25}%`, pad.left - 8, y + 4);
   }
 
-  // Bars
+  // Bar Rendering
   entries.forEach((inter, idx) => {
     const cong = Math.min(1, inter.congestion_level || 0);
     const x = pad.left + gap + idx * (barW + gap);
     const barH = chartH * cong;
     const y = pad.top + chartH - barH;
 
-    // Bar color
-    let color, glow;
-    if (cong > 0.7)       { color = '#ef4444'; glow = 'rgba(239,68,68,0.35)'; }
-    else if (cong > 0.5)  { color = '#f59e0b'; glow = 'rgba(245,158,11,0.35)'; }
-    else                   { color = '#22d3ee'; glow = 'rgba(34,211,238,0.35)'; }
+    let color = '#06b6d4'; // Cyan
+    if (cong > 0.7) color = '#ef4444'; // Red
+    else if (cong > 0.5) color = '#f59e0b'; // Yellow
 
-    // Glow shadow
-    ctx.shadowColor = glow;
-    ctx.shadowBlur  = 8;
-
-    // Gradient fill
-    const grad = ctx.createLinearGradient(0, y, 0, y + barH);
-    grad.addColorStop(0, color);
-    grad.addColorStop(1, color.replace(')', ', 0.4)').replace('rgb', 'rgba'));
-
-    ctx.fillStyle = grad;
-    // Rounded top corners
-    const r = Math.min(4, barW / 2, barH / 2);
+    // Draw Bar with Shadow Glow
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = color + '44';
+    
+    const gradient = ctx.createLinearGradient(x, y, x, y + barH);
+    gradient.addColorStop(0, color);
+    gradient.addColorStop(1, color + '66');
+    ctx.fillStyle = gradient;
+    
+    // Rounded bar
+    const r = 4;
     ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + barW, y, x + barW, y + barH, r);
-    ctx.arcTo(x + barW, y + barH, x, y + barH, 0);
-    ctx.arcTo(x, y + barH, x, y, 0);
-    ctx.arcTo(x, y, x + barW, y, r);
-    ctx.closePath();
+    ctx.roundRect(x, y, barW, barH, [r, r, 0, 0]);
     ctx.fill();
-
     ctx.shadowBlur = 0;
 
-    // Label (short ID)
-    const label = (inter.intersection_id || '').replace('INT-', '');
-    ctx.fillStyle   = 'rgba(148,163,184,0.7)';
-    ctx.font        = '9px JetBrains Mono, monospace';
-    ctx.textAlign   = 'center';
-    ctx.fillText(label, x + barW / 2, H - pad.bottom + 13);
+    // Value Label above bar
+    ctx.fillStyle = color;
+    ctx.font = 'bold 10px JetBrains Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${Math.round(cong * 100)}%`, x + barW / 2, y - 8);
 
-    // Percentage on bar
-    if (barH > 18) {
-      ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      ctx.font      = 'bold 9px Inter, sans-serif';
-      ctx.fillText(`${Math.round(cong * 100)}%`, x + barW / 2, y + 12);
-    }
+    // X-Axis Labels
+    const label = (inter.intersection_id || '').replace('INT-', '');
+    ctx.fillStyle = mutedColor;
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x + barW / 2, H - 10);
   });
 }
 
-/** COMPONENT 2: Intersection Status Indicators */
+/** COMPONENT 2: Status Indicator Matrix */
 function renderIntersections() {
   const grid = document.getElementById('intersection-grid');
   if (!grid) return;
 
   const entries = Object.values(state.intersections);
-  if (entries.length === 0) { grid.innerHTML = '<div class="empty-state">No data yet…</div>'; return; }
+  if (entries.length === 0) { grid.innerHTML = '<div class="empty-state">SCANNING FOR NODES...</div>'; return; }
 
   // Sort by congestion desc
   entries.sort((a, b) => (b.congestion_level || 0) - (a.congestion_level || 0));
@@ -295,29 +280,27 @@ function renderIntersections() {
   grid.innerHTML = entries.map(i => {
     const cong    = Math.min(1, i.congestion_level || 0);
     const pct     = Math.round(cong * 100);
-    const barColor = cong > 0.7 ? 'var(--red)' : cong > 0.5 ? 'var(--yellow)' : 'var(--green)';
+    const color   = cong > 0.7 ? '#ef4444' : cong > 0.5 ? '#f59e0b' : '#10b981';
     const light   = (i.current_light || 'RED').toUpperCase();
-    const zone    = i.zone || '—';
-    const shortName = (i.name || i.intersection_id || '').substring(0, 30);
+    const short   = (i.name || i.intersection_id || '').substring(0, 24);
 
     return `
-      <div class="int-row" title="${i.name || ''} | Vehicles: ${i.vehicle_count || 0} | Status: ${i.status || ''}">
+      <div class="int-row">
         <div class="int-light light-${light}"></div>
-        <div class="int-name">${shortName}</div>
-        <div class="int-cong-bar"><div class="int-cong-fill" style="width:${pct}%;background:${barColor}"></div></div>
-        <div class="int-vehicles">${i.vehicle_count || 0}v</div>
-        <div class="int-zone">${zone}</div>
+        <div class="int-name">${short}</div>
+        <div class="int-cong-bar"><div class="int-cong-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="int-vehicles">${i.vehicle_count || 0}V</div>
       </div>`;
   }).join('');
 }
 
 /** COMPONENT 3: Activity Log */
-const MAX_LOG_ENTRIES = 120;
+const MAX_LOG_ENTRIES = 100;
 function logActivity(label, message, level = 'info') {
-  const log  = document.getElementById('activity-log');
+  const log = document.getElementById('activity-log');
   if (!log) return;
 
-  const ts   = new Date().toLocaleTimeString('en-GB');
+  const ts   = new Date().toLocaleTimeString('en-GB', { hour12: false });
   const item = document.createElement('div');
   item.className = `log-entry log-${level}`;
   item.innerHTML = `
@@ -325,24 +308,24 @@ function logActivity(label, message, level = 'info') {
     <span class="log-label">${label}</span>
     <span class="log-msg">${escHtml(message)}</span>`;
 
-  log.appendChild(item);
+  log.prepend(item); // Newest at top
+  
+  // Flash effect for new log
+  item.style.backgroundColor = 'var(--border-bright)';
+  setTimeout(() => { item.style.backgroundColor = ''; }, 1000);
 
-  // Limit entries
   while (log.children.length > MAX_LOG_ENTRIES) {
-    log.removeChild(log.firstChild);
+    log.removeChild(log.lastChild);
   }
-
-  // Auto-scroll to bottom
-  log.scrollTop = log.scrollHeight;
 }
 
-/** Sensor Grid */
-const SENSOR_TYPE_ICONS = {
-  AIR_QUALITY:   '🌬️',
-  TEMPERATURE:   '🌡️',
-  HUMIDITY:      '💧',
-  NOISE:         '🔊',
-  WATER_QUALITY: '🚿',
+/** SENSOR TELEMETRY */
+const SENSOR_ICONS = {
+  AIR_QUALITY:   'aqi',
+  TEMPERATURE:   'sensor',
+  HUMIDITY:      'sensor',
+  NOISE:         'sensor',
+  WATER_QUALITY: 'sensor',
 };
 
 function renderSensors() {
@@ -350,128 +333,132 @@ function renderSensors() {
   if (!grid) return;
 
   const entries = Object.values(state.sensors);
-  if (entries.length === 0) { grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1">No sensor data yet…</div>'; return; }
+  const iconMap = {
+    'AIR_QUALITY': 'icon-aqi',
+    'TEMPERATURE': 'icon-temp',
+    'HUMIDITY': 'icon-humidity',
+    'NOISE_LEVEL': 'icon-noise',
+    'WATER_QUALITY': 'icon-water'
+  };
 
   grid.innerHTML = entries.map(s => {
-    const icon    = SENSOR_TYPE_ICONS[s.type] || '📡';
     const quality = (s.quality_level || 'UNKNOWN').toUpperCase();
-    const valueStr = s.value !== undefined ? `${s.value} ${s.unit || ''}` : '—';
-
     return `
-      <div class="sensor-card ${quality}" title="${s.name} | ${s.location} | Zone: ${s.zone}">
-        <div class="sensor-name">${icon} ${s.name}</div>
-        <div class="sensor-type">${s.type.replace('_', ' ')}</div>
-        <div class="sensor-value">${valueStr}</div>
-        <span class="sensor-quality quality-${quality}">${quality}</span>
-      </div>`;
-  }).join('');
-
-  document.getElementById('kpi-sensors-val').textContent = entries.filter(s => s.status === 'ONLINE').length;
+    <div class="sensor-card quality-${quality}">
+      <div class="card-header">
+        <span class="sensor-type">${s.type.replace('_', ' ')}</span>
+        <svg class="icon-sm"><use href="#${iconMap[s.type] || 'icon-sensor'}"></use></svg>
+      </div>
+      <div class="sensor-value">${s.value}${s.unit}</div>
+      <div class="sensor-name">${s.name}</div>
+      <div class="sensor-quality quality-${quality}">${quality}</div>
+    </div>
+  `}).join('');
 }
 
-/** Emergency Alerts */
+/** EMERGENCY QUEUE */
+const EMERGENCY_ICONS = {
+  FIRE: 'fire',
+  MEDICAL: 'emergency',
+  CRIME: 'alert',
+  TRAFFIC_ACCIDENT: 'car',
+  NATURAL_DISASTER: 'alert',
+  HAZMAT: 'sensor'
+};
+
 function renderEmergencyAlerts() {
   const list = document.getElementById('emergency-list');
   if (!list) return;
 
   const active = state.alerts.filter(a => a.status !== 'RESOLVED');
-  document.getElementById('alert-count-badge').textContent = `${active.length} ACTIVE`;
+  document.getElementById('alert-count-badge').textContent = `${active.length} THREATS`;
+
+  const emergencyCard = document.querySelector('.card-emergency');
+  if (emergencyCard) {
+    const hasDangerous = active.some(a => a.severity === 'HIGH' || a.severity === 'CRITICAL');
+    if (hasDangerous) emergencyCard.classList.add('danger-blink');
+    else emergencyCard.classList.remove('danger-blink');
+  }
 
   if (active.length === 0) {
-    list.innerHTML = '<div class="empty-state">✅ No active alerts</div>';
+    list.innerHTML = `
+      <div class="empty-state-v2">
+        <div class="radar-container">
+          <div class="radar-ping"></div>
+          <svg class="icon-lg"><use href="#icon-shield"></use></svg>
+        </div>
+        <div class="empty-title">SITUATION NORMAL</div>
+        <div class="empty-desc">All sectors stabilized. System actively monitoring gRPC streams for anomalies.</div>
+      </div>`;
     return;
   }
 
-  // Sort by severity
-  const ORDER = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-  active.sort((a, b) => (ORDER[a.severity] || 4) - (ORDER[b.severity] || 4));
+  active.sort((a, b) => {
+    const order = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+    return (order[a.severity] || 4) - (order[b.severity] || 4);
+  });
 
-  list.innerHTML = active.map(a => `
-    <div class="alert-card ${a.severity}" title="${a.alert_id}">
-      <div class="alert-type">[${a.type || '—'}]</div>
-      <div class="alert-location">📍 ${a.location || '—'}</div>
-      <div class="alert-desc">${(a.description || '').substring(0, 100)}${(a.description || '').length > 100 ? '…' : ''}</div>
-      <div class="alert-meta">
-        <span class="alert-pill pill-sev-${a.severity}">${a.severity}</span>
-        <span class="alert-pill pill-zone">${a.zone || '—'}</span>
-        <span class="alert-pill pill-status">${a.status || '—'}</span>
+  list.innerHTML = active.map(a => {
+    const iconKey = EMERGENCY_ICONS[a.type] || 'alert';
+    return `
+    <div class="alert-card ${a.severity}">
+      <div class="card-header">
+        <div class="card-title-group">
+          <svg class="icon-sm"><use href="#icon-${iconKey}"></use></svg>
+          <div class="alert-type">${a.type}</div>
+        </div>
+        <span class="alert-pill">${a.severity}</span>
       </div>
-    </div>`).join('');
+      <div class="alert-location">📍 ${a.location}</div>
+      <div class="alert-desc">${a.description}</div>
+      <div class="alert-meta">
+        <span class="alert-pill">${a.zone}</span>
+        <span class="alert-pill">${a.status}</span>
+        <span class="alert-pill" style="opacity:0.5">${a.alert_id}</span>
+        <button class="btn-resolve" onclick="resolveAlert('${a.alert_id}')">RESOLVE</button>
+      </div>
+    </div>`}).join('');
 }
 
-/** Render everything */
-function renderAll() {
-  renderTrafficChart();
-  renderIntersections();
-  renderSensors();
-  renderEmergencyAlerts();
-  updateKpis();
-}
-
+/** KPI UPDATES */
 function updateKpis() {
-  const intersections = Object.values(state.intersections);
-  const congested     = intersections.filter(i => (i.congestion_level || 0) > 0.7).length;
-  const activeAlerts  = state.alerts.filter(a => a.status !== 'RESOLVED').length;
-  const onlineSensors = Object.values(state.sensors).filter(s => s.status === 'ONLINE').length;
-
-  document.getElementById('kpi-intersections-val').textContent = intersections.length || '—';
-  document.getElementById('kpi-congested-val').textContent     = congested || '0';
-  document.getElementById('kpi-alerts-val').textContent        = activeAlerts || '0';
-  document.getElementById('kpi-sensors-val').textContent       = onlineSensors || '—';
-}
-
-function computeAvgAqi() {
-  const aqis = Object.values(state.sensors).filter(s => s.type === 'AIR_QUALITY');
-  if (aqis.length === 0) return 0;
-  return Math.round(aqis.reduce((s, x) => s + (x.value || 0), 0) / aqis.length);
+  // Heartbeat handles main KPI values
 }
 
 function colorKpiAqi(aqi) {
   const el = document.getElementById('kpi-aqi-val');
   if (!el) return;
-  if (aqi > 150)      el.style.color = 'var(--red)';
-  else if (aqi > 100) el.style.color = 'var(--yellow)';
-  else if (aqi > 50)  el.style.color = 'var(--orange)';
-  else                el.style.color = 'var(--green)';
+  if (aqi > 150)      el.className = 'kpi-value value-red';
+  else if (aqi > 100) el.className = 'kpi-value value-orange';
+  else                el.className = 'kpi-value value-cyan';
 }
 
-// ── Selects ───────────────────────────────────────────────────────────────────
+// ── UI Logic ──────────────────────────────────────────────────────────────────
+
 function populateSelects() {
-  populateIntersectionSelect();
-  populateUnitSelect();
-}
-
-function populateIntersectionSelect() {
-  const sel = document.getElementById('cmd-intersection-id');
-  if (!sel) return;
-  const entries = Object.values(state.intersections);
-  if (entries.length === 0) return;
-  sel.innerHTML = entries.map(i =>
-    `<option value="${i.intersection_id}">${i.intersection_id} — ${(i.name || '').substring(0, 30)}</option>`
-  ).join('');
-}
-
-function populateUnitSelect() {
-  const sel = document.getElementById('cmd-dispatch-unit');
-  if (!sel) return;
-  const available = Object.values(state.units).filter(u => u.status === 'AVAILABLE');
-  if (available.length === 0) {
-    sel.innerHTML = '<option value="">— no available units —</option>';
-    return;
+  const nodes = document.getElementById('cmd-intersection-id');
+  if (nodes) {
+    const list = Object.values(state.intersections);
+    nodes.innerHTML = list.map(i => `<option value="${i.intersection_id}">${i.intersection_id} - ${i.name}</option>`).join('');
   }
-  sel.innerHTML = available.map(u =>
-    `<option value="${u.unit_id}">${u.unit_id} — ${u.name}</option>`
-  ).join('');
+  
+  const units = document.getElementById('cmd-dispatch-unit');
+  if (units) {
+    const list = Object.values(state.units).filter(u => u.status === 'AVAILABLE');
+    if (list.length === 0) {
+      units.innerHTML = '<option value="">NO ASSETS AVAILABLE</option>';
+    } else {
+      units.innerHTML = list.map(u => `<option value="${u.unit_id}">${u.name} [${u.type}]</option>`).join('');
+    }
+  }
 }
 
-// ── Status helpers ────────────────────────────────────────────────────────────
 function setWsStatus(status) {
-  const dot   = document.getElementById('ws-status-dot');
-  const label = document.getElementById('ws-status-label');
-  if (!dot || !label) return;
-  dot.className   = `ws-dot ${status}`;
-  const labels = { connected: 'Connected', disconnected: 'Disconnected', connecting: 'Connecting…' };
-  label.textContent = labels[status] || status;
+  const dot = document.getElementById('ws-status-dot');
+  const lbl = document.getElementById('ws-status-label');
+  if (!dot || !lbl) return;
+  dot.className = `ws-dot ${status}`;
+  lbl.textContent = status === 'connected' ? 'SECURE LINK ACTIVE' : status.toUpperCase() + '...';
 }
 
 function setCmdOutput(text, type = '') {
@@ -481,140 +468,239 @@ function setCmdOutput(text, type = '') {
   el.className   = `cmd-output ${type}`;
 }
 
-// ── Toast ─────────────────────────────────────────────────────────────────────
 function showToast(title, message, detail = '', severity = 'INFO') {
   const container = document.getElementById('toast-container');
   if (!container) return;
 
+  // Clear previous toasts to show only one at a time
+  container.innerHTML = '';
+
   const toast = document.createElement('div');
   toast.className = `toast toast-${severity}`;
   toast.innerHTML = `
-    <div class="toast-body">
+    <div class="toast-header">
       <div class="toast-title">${escHtml(title)}</div>
-      <div class="toast-msg">${escHtml(message)}</div>
-      ${detail ? `<div class="toast-detail">${escHtml(detail)}</div>` : ''}
-    </div>`;
+      <svg class="icon-sm" style="opacity:0.5"><use href="#icon-alert"></use></svg>
+    </div>
+    <div class="toast-msg">${escHtml(message)}</div>
+    ${detail ? `<div class="toast-detail">${escHtml(detail)}</div>` : ''}`;
+  
+  toast.onclick = () => {
+    toast.classList.add('fade-out');
+    setTimeout(() => toast.remove(), 400);
+    // Scroll to emergency section if it's a serious alert
+    if (severity === 'CRITICAL' || severity === 'HIGH') {
+      document.querySelector('.card-emergency').scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   container.appendChild(toast);
 
-  // Auto-dismiss
-  const DURATION = severity === 'CRITICAL' ? 8000 : 5000;
+  // Add to persistent history
+  state.notifications.unshift({ title, msg: message, detail, severity, ts: new Date().toLocaleTimeString('en-GB', { hour12: false }) });
+  if (state.notifications.length > 20) state.notifications.pop();
+  renderNotifications();
+
   setTimeout(() => {
-    toast.classList.add('fade-out');
-    setTimeout(() => toast.remove(), 350);
-  }, DURATION);
+    if (toast.parentElement) {
+      toast.classList.add('fade-out');
+      setTimeout(() => toast.remove(), 400);
+    }
+  }, 8000);
 }
 
-// ── Utility ───────────────────────────────────────────────────────────────────
+/** RENDER NOTIFICATIONS DROPDOWN */
+function renderNotifications() {
+  const list = document.getElementById('notif-list');
+  if (!list) return;
+
+  if (state.notifications.length === 0) {
+    list.innerHTML = '<div class="empty-state" style="padding: 20px;">NO RECENT ALERTS</div>';
+    return;
+  }
+
+  list.innerHTML = state.notifications.map(n => `
+    <div class="notif-item notif-${n.severity.toLowerCase()}">
+      <div class="notif-item-header">
+        <span class="notif-item-tag badge-${n.severity.toLowerCase() || 'info'}">${n.severity}</span>
+        <span class="notif-item-ts">${n.ts}</span>
+      </div>
+      <div class="notif-item-title">${n.title}</div>
+      <div class="notif-item-msg">${n.msg}</div>
+    </div>
+  `).join('');
+}
+
+function renderAll() {
+  renderTrafficChart();
+  renderIntersections();
+  renderSensors();
+  renderEmergencyAlerts();
+}
+
 function escHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
-// ── Command & Control Bridge ──────────────────────────────────────────────────
-function initCommandPanel() {
-  // Tab switcher
+// ── Event Bindings ────────────────────────────────────────────────────────────
+
+function initTheme() {
+  const themeToggle = document.getElementById('theme-toggle');
+  const themeIcon = document.getElementById('theme-icon');
+  if(!themeToggle) return;
+
+  const getPreferredTheme = () => {
+    if (localStorage.getItem('theme')) return localStorage.getItem('theme');
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  };
+
+  const setTheme = (theme) => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    if (theme === 'dark') {
+      themeIcon.innerHTML = '<use href="#icon-sun"></use>';
+    } else {
+      themeIcon.innerHTML = '<use href="#icon-moon"></use>';
+    }
+    renderTrafficChart();
+  };
+
+  themeToggle.addEventListener('click', () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+  });
+
+  setTheme(getPreferredTheme());
+}
+
+function init() {
+  initTheme();
+  // Tab Switcher
   document.querySelectorAll('.cmd-tab').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.cmd-tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const tab = btn.dataset.tab;
-      document.getElementById('panel-traffic').style.display   = tab === 'traffic'   ? '' : 'none';
-      document.getElementById('panel-emergency').style.display = tab === 'emergency' ? '' : 'none';
+      document.getElementById('panel-traffic').style.display   = tab === 'traffic'   ? 'flex' : 'none';
+      document.getElementById('panel-emergency').style.display = tab === 'emergency' ? 'flex' : 'none';
     });
   });
 
-  // ── Traffic commands ──────────────────────────────────────────────────────
+  // Traffic Override
   document.getElementById('btn-update-light').addEventListener('click', () => {
-    const id       = document.getElementById('cmd-intersection-id').value;
-    const newLight = document.getElementById('cmd-light').value;
-    const duration = parseInt(document.getElementById('cmd-duration').value, 10) || 60;
-    const reason   = document.getElementById('cmd-reason').value || 'WebUI Override';
-
-    if (!id) { setCmdOutput('⚠ Please select an intersection', 'error'); return; }
-
     sendCommand('update_traffic_light', {
-      intersection_id: id,
-      new_light: newLight,
-      duration_seconds: duration,
-      reason,
+      intersection_id: document.getElementById('cmd-intersection-id').value,
+      new_light: document.getElementById('cmd-light').value,
+      duration_seconds: parseInt(document.getElementById('cmd-duration').value) || 60,
+      reason: document.getElementById('cmd-reason').value || 'Manual override'
     });
   });
 
+  // Incident Broadcast
   document.getElementById('btn-report-incident').addEventListener('click', () => {
-    const id       = document.getElementById('cmd-intersection-id').value;
-    const type     = document.getElementById('cmd-incident-type').value;
-    const severity = document.getElementById('cmd-incident-severity').value;
-    const desc     = document.getElementById('cmd-incident-desc').value || 'Reported via WebUI';
-
-    if (!id) { setCmdOutput('⚠ Please select an intersection', 'error'); return; }
-
     sendCommand('report_incident', {
-      intersection_id: id,
-      type,
-      severity,
-      description: desc,
-      reported_by: 'WebUI Operator',
+      intersection_id: document.getElementById('cmd-intersection-id').value,
+      type: document.getElementById('cmd-incident-type').value,
+      severity: document.getElementById('cmd-incident-severity').value,
+      description: document.getElementById('cmd-incident-desc').value || 'System manual report'
     });
   });
 
-  // ── Emergency commands ────────────────────────────────────────────────────
+  // Emergency Initiation
   document.getElementById('btn-create-alert').addEventListener('click', () => {
     sendCommand('create_alert', {
-      type:          document.getElementById('cmd-alert-type').value,
-      severity:      document.getElementById('cmd-alert-severity').value,
-      location:      document.getElementById('cmd-alert-location').value || 'WebUI Location',
-      zone:          document.getElementById('cmd-alert-zone').value,
-      description:   document.getElementById('cmd-alert-desc').value || 'Created via WebUI',
-      reporter_name: 'WebUI Operator',
+      type: document.getElementById('cmd-alert-type').value,
+      severity: document.getElementById('cmd-alert-severity').value,
+      location: document.getElementById('cmd-alert-location').value || 'Unknown Sector',
+      zone: document.getElementById('cmd-alert-zone').value,
+      description: document.getElementById('cmd-alert-desc').value || 'Alert triggered from Command Center'
     });
   });
 
+  // Asset Deployment
   document.getElementById('btn-dispatch-unit').addEventListener('click', () => {
-    const alert_id = document.getElementById('cmd-dispatch-alert').value.trim();
-    const unit_id  = document.getElementById('cmd-dispatch-unit').value;
-
-    if (!alert_id) { setCmdOutput('⚠ Please enter an Alert ID', 'error'); return; }
-    if (!unit_id)  { setCmdOutput('⚠ Please select a unit', 'error'); return; }
-
-    sendCommand('dispatch_unit', { alert_id, unit_id });
+    sendCommand('dispatch_unit', {
+      alert_id: document.getElementById('cmd-dispatch-alert').value,
+      unit_id: document.getElementById('cmd-dispatch-unit').value
+    });
   });
 
-  // Clear log button
+  // Log Purge
   document.getElementById('clear-log-btn').addEventListener('click', () => {
     const log = document.getElementById('activity-log');
     if (log) log.innerHTML = '';
-    logActivity('SYSTEM', 'Log cleared', 'system');
+    logActivity('KERNEL', 'Buffer cleared', 'system');
   });
-}
 
-// ── Clock ─────────────────────────────────────────────────────────────────────
-function startClock() {
-  function tick() {
+  // Window Resize
+  window.addEventListener('resize', () => renderTrafficChart());
+
+  // Start Clock
+  setInterval(() => {
     const el = document.getElementById('server-time');
-    if (el && el.textContent === '--:--:--') {
-      el.textContent = new Date().toLocaleTimeString();
+    if (el) {
+      el.textContent = new Date().toLocaleTimeString('en-GB', { hour12: false });
     }
+  }, 1000);
+
+  // Alert Bell Click
+  const bell = document.getElementById('alert-bell');
+  if (bell) {
+    bell.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dropdown = document.getElementById('notif-dropdown');
+      if (dropdown) dropdown.classList.toggle('active');
+      
+      state.totalAlerts = 0;
+      const badge = document.getElementById('alert-count');
+      if (badge) {
+        badge.textContent = '0';
+        badge.style.display = 'none';
+      }
+    });
   }
-  tick();
-  setInterval(tick, 1000);
+
+  // Close dropdown on outside click
+  document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('notif-dropdown');
+    if (dropdown && !dropdown.contains(e.target)) {
+      dropdown.classList.remove('active');
+    }
+  });
+
+  connectWS();
 }
 
-// ── Resize → redraw chart ─────────────────────────────────────────────────────
-window.addEventListener('resize', () => renderTrafficChart());
+function resolveAlert(alertId) {
+  // Use a custom modal or just send it if the user clicked resolve
+  sendCommand('resolve_alert', { alert_id: alertId });
+  logActivity('COMMAND', `Initiating resolution for ${alertId}...`, 'info');
+}
 
-// ── Refresh unit select periodically ─────────────────────────────────────────
-setInterval(() => {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    sendCommand('list_units');
+window.resolveAlert = resolveAlert;
+
+/** Perfect Touch: Synthesized Alert Sound */
+function playAlertSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.5);
+    
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.start();
+    osc.stop(ctx.currentTime + 0.5);
+  } catch (e) {
+    // Silent fail if audio is blocked
   }
-}, 30000);
+}
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  initCommandPanel();
-  startClock();
-  connectWS();
-});
+document.addEventListener('DOMContentLoaded', init);

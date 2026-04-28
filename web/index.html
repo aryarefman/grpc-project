@@ -3,73 +3,155 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NovaPulse — Smart City Control Center</title>
+  <title>NovaPulse — Smart City Command & Control</title>
   <meta name="description" content="NovaPulse Smart City gRPC Control Center — Real-time traffic, environment, and emergency management powered by WebSocket and gRPC." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <!-- ╔══════════════════════════════════╗ -->
+  <!-- ║         SVG ICON LIBRARY        ║ -->
+  <!-- ╚══════════════════════════════════╝ -->
+  <svg style="display: none;">
+    <!-- Minimalist Professional Icons -->
+    <symbol id="icon-traffic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect>
+    </symbol>
+    <symbol id="icon-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </symbol>
+    <symbol id="icon-sensor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+    </symbol>
+    <symbol id="icon-emergency" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+    </symbol>
+    <symbol id="icon-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line>
+    </symbol>
+    <symbol id="icon-log" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line>
+    </symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </symbol>
+    <symbol id="icon-aqi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17.5 19c2.5 0 4.5-2 4.5-4.5S20 10 17.5 10c-.3 0-.6.1-.9.1A7.5 7.5 0 0 0 2.5 14c0 4.1 3.4 7.5 7.5 7.5"></path><path d="M14 21v-8l-4-4"></path>
+    </symbol>
+    <symbol id="icon-active-nodes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line>
+    </symbol>
+    <symbol id="icon-congested" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a2 2 0 0 0-1.6-.8H9.3a2 2 0 0 0-1.6.8L5 11l-5.16.86a1 1 0 0 0-.84.99V16h3m10 0a3 3 0 1 1-6 0m10 0a3 3 0 1 1-6 0"></path>
+    </symbol>
+    <symbol id="icon-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+    </symbol>
+    <symbol id="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+    </symbol>
+    <symbol id="icon-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+    </symbol>
+    <symbol id="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </symbol>
+    <symbol id="icon-temp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
+    </symbol>
+    <symbol id="icon-humidity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
+    </symbol>
+    <symbol id="icon-noise" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+    </symbol>
+    <symbol id="icon-water" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 6c.6.5 1.2 1 2.5 1C5.8 7 7 5.5 7 5.5S8.2 4 9.5 4c1.3 0 2.5 1.5 2.5 1.5S13.2 7 14.5 7c1.3 0 2.5-1.5 2.5-1.5S18.2 4 19.5 4c1.3 0 2.5 1.5 2.5 1.5M2 12c.6.5 1.2 1 2.5 1 1.3 0 2.5-1.5 2.5-1.5S8.2 10 9.5 10c1.3 0 2.5 1.5 2.5 1.5S13.2 13 14.5 13c1.3 0 2.5-1.5 2.5-1.5S18.2 10 19.5 10c1.3 0 2.5 1.5 2.5 1.5M2 18c.6.5 1.2 1 2.5 1 1.3 0 2.5-1.5 2.5-1.5S8.2 16 9.5 16c1.3 0 2.5 1.5 2.5 1.5S13.2 19 14.5 19c1.3 0 2.5-1.5 2.5-1.5S18.2 16 19.5 16c1.3 0 2.5 1.5 2.5 1.5"></path>
+    </symbol>
+
+  </svg>
+
+  <!-- ╔══════════════════════════════════╗ -->
   <!-- ║         TOP NAV BAR             ║ -->
   <!-- ╚══════════════════════════════════╝ -->
-  <header id="top-nav" class="topnav">
-    <div class="topnav-left">
-      <div class="logo-mark">⚡</div>
-      <div class="logo-text">
-        <span class="logo-main">NovaPulse</span>
-        <span class="logo-sub">Smart City Control Center</span>
+  <div class="topnav-wrapper">
+    <header id="top-nav" class="topnav">
+      <div class="topnav-left">
+        <div class="logo-mark">
+          <img src="image/logo.png" alt="NovaPulse Logo" class="icon" style="object-fit: contain;">
+        </div>
+        <div class="logo-text">
+          <span class="logo-main">NovaPulse</span>
+          <span class="logo-sub">Command & Control</span>
+        </div>
       </div>
-    </div>
-    <div class="topnav-center">
-      <div id="ws-status-dot" class="ws-dot disconnected"></div>
-      <span id="ws-status-label" class="ws-label">Connecting…</span>
-    </div>
-    <div class="topnav-right">
-      <span id="server-time" class="server-time">--:--:--</span>
-      <div id="alert-bell" class="bell-btn" title="Notifications">
-        🔔 <span id="alert-count" class="badge">0</span>
+      <div class="topnav-center">
+        <div id="ws-status-dot" class="ws-dot disconnected"></div>
+        <span id="ws-status-label" class="ws-label">ESTABLISHING LINK...</span>
       </div>
-    </div>
-  </header>
+      <div class="topnav-right">
+        <div class="time-block">
+          <span class="time-label">LOCAL TIME</span>
+          <span id="server-time" class="server-time">--:--:--</span>
+        </div>
+        <div id="alert-bell" class="bell-btn" title="System Notifications">
+          <svg class="icon-md"><use href="#icon-bell"></use></svg>
+          <span id="alert-count" class="badge">0</span>
+        </div>
+        <div id="notif-dropdown" class="notif-dropdown">
+          <div class="notif-header">
+            <span class="notif-title">SYSTEM ALERTS</span>
+            <span class="ws-label" style="font-size: 0.5rem;">REAL-TIME</span>
+          </div>
+          <div id="notif-list" class="notif-list">
+            <div class="empty-state" style="padding: 20px;">NO RECENT ALERTS</div>
+          </div>
+        </div>
+        <div id="theme-toggle" class="theme-btn" title="Toggle Theme">
+          <svg class="icon-md" id="theme-icon"><use href="#icon-moon"></use></svg>
+        </div>
+      </div>
+    </header>
+  </div>
 
   <!-- ╔══════════════════════════════════╗ -->
   <!-- ║         KPI STRIP               ║ -->
   <!-- ╚══════════════════════════════════╝ -->
   <section id="kpi-strip" class="kpi-strip">
     <div class="kpi-card" id="kpi-intersections">
-      <div class="kpi-icon">🚦</div>
+      <div class="kpi-icon-wrap"><svg class="icon"><use href="#icon-active-nodes"></use></svg></div>
       <div class="kpi-body">
         <div class="kpi-value" id="kpi-intersections-val">—</div>
-        <div class="kpi-label">Intersections</div>
+        <div class="kpi-label">Active Nodes</div>
       </div>
     </div>
     <div class="kpi-card" id="kpi-congested">
-      <div class="kpi-icon">🔴</div>
+      <div class="kpi-icon-wrap icon-red"><svg class="icon"><use href="#icon-congested"></use></svg></div>
       <div class="kpi-body">
-        <div class="kpi-value" id="kpi-congested-val">—</div>
+        <div class="kpi-value value-red" id="kpi-congested-val">—</div>
         <div class="kpi-label">Congested</div>
       </div>
     </div>
     <div class="kpi-card" id="kpi-alerts">
-      <div class="kpi-icon">🚨</div>
+      <div class="kpi-icon-wrap icon-orange"><svg class="icon"><use href="#icon-emergency"></use></svg></div>
       <div class="kpi-body">
-        <div class="kpi-value" id="kpi-alerts-val">—</div>
-        <div class="kpi-label">Active Alerts</div>
+        <div class="kpi-value value-orange" id="kpi-alerts-val">—</div>
+        <div class="kpi-label">Critical Alerts</div>
       </div>
     </div>
     <div class="kpi-card" id="kpi-aqi">
-      <div class="kpi-icon">🌬️</div>
+      <div class="kpi-icon-wrap icon-cyan"><svg class="icon"><use href="#icon-aqi"></use></svg></div>
       <div class="kpi-body">
-        <div class="kpi-value" id="kpi-aqi-val">—</div>
-        <div class="kpi-label">Avg AQI</div>
+        <div class="kpi-value value-cyan" id="kpi-aqi-val">—</div>
+        <div class="kpi-label">System AQI</div>
       </div>
     </div>
     <div class="kpi-card" id="kpi-sensors">
-      <div class="kpi-icon">📡</div>
+      <div class="kpi-icon-wrap icon-purple"><svg class="icon"><use href="#icon-sensor"></use></svg></div>
       <div class="kpi-body">
-        <div class="kpi-value" id="kpi-sensors-val">—</div>
-        <div class="kpi-label">Sensors Online</div>
+        <div class="kpi-value value-purple" id="kpi-sensors-val">—</div>
+        <div class="kpi-label">IoT Sensors</div>
       </div>
     </div>
   </section>
@@ -80,24 +162,32 @@
   <main class="main-grid">
 
     <!-- ── COMPONENT 1: Traffic Chart ─────────────────────────────────────── -->
-    <section class="card card-chart" aria-label="Traffic Congestion Chart">
+    <section class="card card-chart" aria-label="Traffic Congestion Data">
       <div class="card-header">
-        <span class="card-title">📊 Live Traffic Congestion</span>
+        <div class="card-title-group">
+          <svg class="icon-sm"><use href="#icon-chart"></use></svg>
+          <span class="card-title">Live Node Congestion Analysis</span>
+        </div>
         <span class="card-badge" id="traffic-badge">STREAMING</span>
       </div>
-      <canvas id="traffic-chart" width="600" height="220" aria-label="Bar chart of traffic congestion by intersection"></canvas>
+      <div class="canvas-container">
+        <canvas id="traffic-chart" width="600" height="220" aria-label="Congestion chart"></canvas>
+      </div>
       <div class="chart-legend">
-        <span class="legend-item"><span class="legend-dot" style="background:#22d3ee"></span>Low (&lt;50%)</span>
-        <span class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>Medium (50–70%)</span>
-        <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span>High (&gt;70%)</span>
+        <span class="legend-item"><span class="legend-dot dot-cyan"></span>OPTIMAL (<50%)</span>
+        <span class="legend-item"><span class="legend-dot dot-yellow"></span>MODERATE (50–70%)</span>
+        <span class="legend-item"><span class="legend-dot dot-red"></span>CRITICAL (>70%)</span>
       </div>
     </section>
 
     <!-- ── COMPONENT 2: Status Indicator panel ────────────────────────────── -->
-    <section class="card card-status" aria-label="Intersection Status Panel">
+    <section class="card card-status" aria-label="Intersection Monitoring">
       <div class="card-header">
-        <span class="card-title">🚦 Intersection Status</span>
-        <span class="card-badge live-pulse">LIVE</span>
+        <div class="card-title-group">
+          <svg class="icon-sm"><use href="#icon-traffic"></use></svg>
+          <span class="card-title">Node Status Matrix</span>
+        </div>
+        <span class="card-badge live-pulse">REAL-TIME</span>
       </div>
       <div id="intersection-grid" class="intersection-grid">
         <!-- populated by JS -->
@@ -105,25 +195,31 @@
     </section>
 
     <!-- ── COMPONENT 3: Activity Log panel ───────────────────────────────── -->
-    <section class="card card-log" aria-label="Real-time Activity Log">
+    <section class="card card-log" aria-label="System Activity Log">
       <div class="card-header">
-        <span class="card-title">📋 Activity Log</span>
-        <button id="clear-log-btn" class="btn btn-ghost btn-sm">Clear</button>
+        <div class="card-title-group">
+          <svg class="icon-sm"><use href="#icon-log"></use></svg>
+          <span class="card-title">Event Sequence Log</span>
+        </div>
+        <button id="clear-log-btn" class="btn btn-ghost btn-sm">PURGE LOG</button>
       </div>
-      <div id="activity-log" class="activity-log" role="log" aria-live="polite" aria-label="Activity log entries">
-        <div class="log-entry log-info">
+      <div id="activity-log" class="activity-log" role="log" aria-live="polite">
+        <div class="log-entry log-system">
           <span class="log-ts">--:--:--</span>
-          <span class="log-label">SYSTEM</span>
-          <span class="log-msg">Waiting for WebSocket connection…</span>
+          <span class="log-label">KERNEL</span>
+          <span class="log-msg">Initializing Secure WebSocket handshake...</span>
         </div>
       </div>
     </section>
 
     <!-- ── Sensor Grid ────────────────────────────────────────────────────── -->
-    <section class="card card-sensors" aria-label="Environment Sensors">
+    <section class="card card-sensors" aria-label="Environment Telemetry">
       <div class="card-header">
-        <span class="card-title">🌡️ Environment Sensors</span>
-        <span class="card-badge">POLLING</span>
+        <div class="card-title-group">
+          <svg class="icon-sm"><use href="#icon-sensor"></use></svg>
+          <span class="card-title">Environmental Telemetry</span>
+        </div>
+        <span class="card-badge">NETWORKED</span>
       </div>
       <div id="sensor-grid" class="sensor-grid">
         <!-- populated by JS -->
@@ -131,144 +227,160 @@
     </section>
 
     <!-- ── Emergency Alerts ───────────────────────────────────────────────── -->
-    <section class="card card-emergency" aria-label="Emergency Alerts">
+    <section class="card card-emergency" aria-label="Incident Response">
       <div class="card-header">
-        <span class="card-title">🚨 Emergency Alerts</span>
-        <span id="alert-count-badge" class="card-badge badge-red">0 ACTIVE</span>
+        <div class="card-title-group">
+          <svg class="icon-sm"><use href="#icon-alert"></use></svg>
+          <span class="card-title">Priority Incident Queue</span>
+        </div>
+        <span id="alert-count-badge" class="card-badge badge-red">0 THREATS</span>
       </div>
       <div id="emergency-list" class="emergency-list">
-        <div class="empty-state">No active alerts</div>
+        <div class="empty-state">No priority incidents detected.</div>
       </div>
     </section>
 
     <!-- ── COMMAND & CONTROL BRIDGE ───────────────────────────────────────── -->
-    <section class="card card-command" aria-label="Command and Control Panel">
+    <section class="card card-command" aria-label="System Command Center">
       <div class="card-header">
-        <span class="card-title">⚙️ Command & Control Bridge</span>
-        <span class="card-badge badge-purple">gRPC→WebSocket</span>
+        <div class="card-title-group">
+          <svg class="icon-sm"><use href="#icon-settings"></use></svg>
+          <span class="card-title">Command & Control Interface</span>
+        </div>
+        <span class="card-badge badge-purple">gRPC / WS BRIDGE</span>
       </div>
 
       <div class="cmd-tabs">
-        <button class="cmd-tab active" id="tab-traffic" data-tab="traffic">Traffic</button>
-        <button class="cmd-tab" id="tab-emergency" data-tab="emergency">Emergency</button>
+        <button class="cmd-tab active" id="tab-traffic" data-tab="traffic">NODE CONTROL</button>
+        <button class="cmd-tab" id="tab-emergency" data-tab="emergency">EMERGENCY OPS</button>
       </div>
 
       <!-- Traffic commands -->
       <div id="panel-traffic" class="cmd-panel">
-        <div class="form-group">
-          <label for="cmd-intersection-id">Intersection ID</label>
-          <select id="cmd-intersection-id">
-            <option value="">— loading… —</option>
-          </select>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Manual Signal Override</div>
+          <div class="cmd-form-row">
+            <div class="form-group">
+              <label for="cmd-intersection-id">TARGET NODE</label>
+              <select id="cmd-intersection-id"><option value="">— SCANNING NODES… —</option></select>
+            </div>
+            <div class="form-group">
+              <label for="cmd-light">SIGNAL OVERRIDE</label>
+              <select id="cmd-light">
+                <option value="RED">STALL (RED)</option>
+                <option value="YELLOW">CAUTION (YELLOW)</option>
+                <option value="GREEN" selected>PROCEED (GREEN)</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex: 0.5;">
+              <label for="cmd-duration">TTL (SEC)</label>
+              <input id="cmd-duration" type="number" min="10" max="3600" value="60" />
+            </div>
+            <div class="form-group">
+              <label for="cmd-reason">AUTHORIZATION</label>
+              <input id="cmd-reason" type="text" placeholder="Reason..." />
+            </div>
+            <button id="btn-update-light" class="btn btn-primary" type="button">EXECUTE</button>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="cmd-light">New Light</label>
-          <select id="cmd-light">
-            <option value="RED">🔴 RED</option>
-            <option value="YELLOW">🟡 YELLOW</option>
-            <option value="GREEN" selected>🟢 GREEN</option>
-          </select>
+
+        <div class="cmd-section">
+          <div class="cmd-section-title">Broadcast Incident</div>
+          <div class="cmd-form-row">
+            <div class="form-group">
+              <label for="cmd-incident-type">INCIDENT VECTOR</label>
+              <select id="cmd-incident-type">
+                <option value="ACCIDENT">ACCIDENT</option>
+                <option value="CONSTRUCTION">CONSTRUCTION</option>
+                <option value="FLOOD">ENVIRONMENTAL</option>
+                <option value="BREAKDOWN">VEHICLE STALL</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="cmd-incident-severity">THREAT LEVEL</label>
+              <select id="cmd-incident-severity">
+                <option value="LOW">LOW</option>
+                <option value="MEDIUM" selected>MEDIUM</option>
+                <option value="HIGH">HIGH</option>
+                <option value="CRITICAL">CRITICAL</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex: 2;">
+              <label for="cmd-incident-desc">SITUATION SUMMARY</label>
+              <input id="cmd-incident-desc" type="text" placeholder="Describe the incident..." />
+            </div>
+            <button id="btn-report-incident" class="btn btn-primary" type="button">BROADCAST</button>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="cmd-duration">Duration (seconds)</label>
-          <input id="cmd-duration" type="number" min="10" max="3600" value="60" />
-        </div>
-        <div class="form-group">
-          <label for="cmd-reason">Reason</label>
-          <input id="cmd-reason" type="text" placeholder="WebUI Override" />
-        </div>
-        <button id="btn-update-light" class="btn btn-primary" type="button">
-          🚦 Update Traffic Light → gRPC
-        </button>
-        <hr class="divider" />
-        <div class="form-group">
-          <label for="cmd-incident-type">Incident Type</label>
-          <select id="cmd-incident-type">
-            <option value="ACCIDENT">ACCIDENT</option>
-            <option value="CONSTRUCTION">CONSTRUCTION</option>
-            <option value="FLOOD">FLOOD</option>
-            <option value="BREAKDOWN">BREAKDOWN</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="cmd-incident-severity">Severity</label>
-          <select id="cmd-incident-severity">
-            <option value="LOW">LOW</option>
-            <option value="MEDIUM" selected>MEDIUM</option>
-            <option value="HIGH">HIGH</option>
-            <option value="CRITICAL">CRITICAL</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="cmd-incident-desc">Description</label>
-          <input id="cmd-incident-desc" type="text" placeholder="Incident description…" />
-        </div>
-        <button id="btn-report-incident" class="btn btn-warning" type="button">
-          ⚠️ Report Incident → gRPC
-        </button>
       </div>
 
       <!-- Emergency commands -->
       <div id="panel-emergency" class="cmd-panel" style="display:none">
-        <div class="form-group">
-          <label for="cmd-alert-type">Alert Type</label>
-          <select id="cmd-alert-type">
-            <option value="FIRE">FIRE</option>
-            <option value="MEDICAL">MEDICAL</option>
-            <option value="CRIME">CRIME</option>
-            <option value="NATURAL_DISASTER">NATURAL_DISASTER</option>
-            <option value="HAZMAT">HAZMAT</option>
-            <option value="TRAFFIC_ACCIDENT">TRAFFIC_ACCIDENT</option>
-          </select>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Initiate Emergency Response</div>
+          <div class="cmd-form-row">
+            <div class="form-group">
+              <label for="cmd-alert-type">ALERT VECTOR</label>
+              <select id="cmd-alert-type">
+                <option value="FIRE">FIRE / HAZARD</option>
+                <option value="MEDICAL">MEDICAL</option>
+                <option value="CRIME">SECURITY BREACH</option>
+                <option value="NATURAL_DISASTER">NATURAL ANOMALY</option>
+                <option value="HAZMAT">CHEMICAL / BIO</option>
+                <option value="TRAFFIC_ACCIDENT">COLLISION</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="cmd-alert-severity">SEVERITY</label>
+              <select id="cmd-alert-severity">
+                <option value="LOW">LOW</option>
+                <option value="MEDIUM">MEDIUM</option>
+                <option value="HIGH" selected>HIGH</option>
+                <option value="CRITICAL">CRITICAL</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="cmd-alert-zone">DEPLOYMENT ZONE</label>
+              <select id="cmd-alert-zone">
+                <option value="CENTRAL">CENTRAL HUB</option>
+                <option value="NORTH">NORTH SECTOR</option>
+                <option value="SOUTH">SOUTH SECTOR</option>
+                <option value="EAST">EAST SECTOR</option>
+                <option value="WEST">WEST SECTOR</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="cmd-alert-location">SECTOR ADDRESS</label>
+              <input id="cmd-alert-location" type="text" placeholder="Sector or address..." />
+            </div>
+            <div class="form-group" style="flex: 1.5;">
+              <label for="cmd-alert-desc">NOTES</label>
+              <input id="cmd-alert-desc" type="text" placeholder="Instructions..." />
+            </div>
+            <button id="btn-create-alert" class="btn btn-primary" type="button">INITIATE</button>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="cmd-alert-severity">Severity</label>
-          <select id="cmd-alert-severity">
-            <option value="LOW">LOW</option>
-            <option value="MEDIUM">MEDIUM</option>
-            <option value="HIGH" selected>HIGH</option>
-            <option value="CRITICAL">CRITICAL</option>
-          </select>
+
+        <div class="cmd-section">
+          <div class="cmd-section-title">Asset Deployment</div>
+          <div class="cmd-form-row">
+            <div class="form-group">
+              <label for="cmd-dispatch-alert">TARGET ALERT ID</label>
+              <input id="cmd-dispatch-alert" type="text" placeholder="ALRT-XXXXXXXX" />
+            </div>
+            <div class="form-group" style="flex: 2;">
+              <label for="cmd-dispatch-unit">ASSET DISPATCH</label>
+              <select id="cmd-dispatch-unit">
+                <option value="">— SEARCHING ASSETS… —</option>
+              </select>
+            </div>
+            <button id="btn-dispatch-unit" class="btn btn-primary" type="button">CONFIRM DEPLOYMENT</button>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="cmd-alert-location">Location</label>
-          <input id="cmd-alert-location" type="text" placeholder="e.g. Jl. Sudirman No.1" />
-        </div>
-        <div class="form-group">
-          <label for="cmd-alert-zone">Zone</label>
-          <select id="cmd-alert-zone">
-            <option value="CENTRAL">CENTRAL</option>
-            <option value="NORTH">NORTH</option>
-            <option value="SOUTH">SOUTH</option>
-            <option value="EAST">EAST</option>
-            <option value="WEST">WEST</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="cmd-alert-desc">Description</label>
-          <input id="cmd-alert-desc" type="text" placeholder="Alert description…" />
-        </div>
-        <button id="btn-create-alert" class="btn btn-danger" type="button">
-          🚨 Create Emergency Alert → gRPC
-        </button>
-        <hr class="divider" />
-        <div class="form-group">
-          <label for="cmd-dispatch-alert">Alert ID</label>
-          <input id="cmd-dispatch-alert" type="text" placeholder="ALRT-XXXXXXXX" />
-        </div>
-        <div class="form-group">
-          <label for="cmd-dispatch-unit">Unit ID</label>
-          <select id="cmd-dispatch-unit">
-            <option value="">— loading… —</option>
-          </select>
-        </div>
-        <button id="btn-dispatch-unit" class="btn btn-primary" type="button">
-          🚑 Dispatch Unit → gRPC
-        </button>
       </div>
 
       <!-- Command result output -->
-      <div id="cmd-output" class="cmd-output" role="status" aria-live="polite">Ready</div>
+      <div id="cmd-output" class="cmd-output" role="status" aria-live="polite">SYSTEM READY</div>
     </section>
 
   </main>
@@ -276,7 +388,7 @@
   <!-- ╔══════════════════════════════════╗ -->
   <!-- ║      NOTIFICATION TOASTS        ║ -->
   <!-- ╚══════════════════════════════════╝ -->
-  <div id="toast-container" class="toast-container" aria-live="assertive" aria-label="System notifications"></div>
+  <div id="toast-container" class="toast-container" aria-live="assertive"></div>
 
   <script src="app.js"></script>
 </body>

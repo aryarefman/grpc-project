@@ -56,17 +56,17 @@ class InMemoryStore extends EventEmitter {
 
     // Seed sensors
     const sensors = [
-      { name: 'AQ-Sensor Sudirman', type: 'AIR_QUALITY', location: 'Jl. Sudirman No. 1', zone: 'CENTRAL', lat: -6.2088, lng: 106.8456 },
-      { name: 'Temp-Sensor Thamrin', type: 'TEMPERATURE', location: 'Jl. Thamrin No. 5', zone: 'CENTRAL', lat: -6.1954, lng: 106.8231 },
-      { name: 'Humidity-Sensor Kemang', type: 'HUMIDITY', location: 'Jl. Kemang Raya', zone: 'SOUTH', lat: -6.2615, lng: 106.8106 },
-      { name: 'Noise-Sensor Mangga Dua', type: 'NOISE', location: 'Jl. Mangga Dua Raya', zone: 'NORTH', lat: -6.1481, lng: 106.8298 },
-      { name: 'AQ-Sensor Kuningan', type: 'AIR_QUALITY', location: 'Jl. Kuningan', zone: 'EAST', lat: -6.2297, lng: 106.8372 },
-      { name: 'Water-Sensor Ciliwung', type: 'WATER_QUALITY', location: 'Sungai Ciliwung', zone: 'CENTRAL', lat: -6.2146, lng: 106.8451 },
+      { name: 'AQ-Sensor Sudirman', type: 'AIR_QUALITY', location: 'Jl. Sudirman No. 1', zone: 'CENTRAL', lat: -6.2088, lng: 106.8456, initial: { value: 192, unit: 'AQI', quality: 'HAZARDOUS' } },
+      { name: 'Temp-Sensor Thamrin', type: 'TEMPERATURE', location: 'Jl. Thamrin No. 5', zone: 'CENTRAL', lat: -6.1954, lng: 106.8231, initial: { value: 35.1, unit: '°C', quality: 'POOR' } },
+      { name: 'Humidity-Sensor Kemang', type: 'HUMIDITY', location: 'Jl. Kemang Raya', zone: 'SOUTH', lat: -6.2615, lng: 106.8106, initial: { value: 51.3, unit: '%', quality: 'GOOD' } },
+      { name: 'Noise-Sensor Mangga Dua', type: 'NOISE', location: 'Jl. Mangga Dua Raya', zone: 'NORTH', lat: -6.1481, lng: 106.8298, initial: { value: 40.9, unit: 'dB', quality: 'GOOD' } },
+      { name: 'AQ-Sensor Kuningan', type: 'AIR_QUALITY', location: 'Jl. Kuningan', zone: 'EAST', lat: -6.2297, lng: 106.8372, initial: { value: 72, unit: 'AQI', quality: 'MODERATE' } },
+      { name: 'Water-Sensor Ciliwung', type: 'WATER_QUALITY', location: 'Sungai Ciliwung', zone: 'CENTRAL', lat: -6.2146, lng: 106.8451, initial: { value: 44.6, unit: 'WQI', quality: 'POOR' } },
     ];
 
     sensors.forEach(s => {
       const id = `SNS-${uuidv4().substring(0, 8).toUpperCase()}`;
-      const value = this._generateSensorValue(s.type);
+      const value = s.initial || this._generateSensorValue(s.type);
       this.sensors.set(id, {
         sensor_id: id,
         name: s.name,
