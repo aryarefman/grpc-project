@@ -76,7 +76,7 @@
 **📍 Kode yang relevan:**
 
 ```
-📄 server/webServer.js — Baris 6–35
+📄 server/webServer.js — Baris 24–27
 ```
 ```javascript
 // Baris 24–27: HTTP Server + pasang WebSocket bridge
@@ -87,24 +87,26 @@ httpServer.listen(WEB_PORT, ...);     // Port 3000: HTTP + WS sekaligus
 > 💡 **Kesimpulan Inti:** Bayangkan satu pintu toko yang bisa melayani dua jenis pelanggan — yang mau beli barang (HTTP/halaman web) dan yang mau ngobrol langsung (WebSocket). Keduanya pakai port yang sama yaitu 3000, jadi browser tidak perlu alamat berbeda.
 
 ```
-📄 server/websocketBridge.js — Baris 312–347
+📄 server/websocketBridge.js — Baris 314–364
 ```
 ```javascript
-// Baris 312–313: Buat WebSocket server menempel ke HTTP server
+// Baris 314–315: Buat WebSocket server menempel ke HTTP server
 function attachWebSocket(httpServer) {
   const wss = new WebSocket.Server({ server: httpServer });
 
-  // Baris 316–319: Delay 1.5 detik lalu mulai gRPC stream + server push
+  // Baris 318–321: Delay 1.5 detik lalu mulai gRPC stream + server push
   setTimeout(() => {
     startGrpcStreams(wss);
     startServerPush(wss);
   }, 1500);
 
-  // Baris 321–335: Saat browser connect → kirim initial state
+  // Baris 323–340: Saat browser connect → kirim initial state
   wss.on('connection', (ws, req) => {
+    // ... (data snapshot dipersiapkan) ...
     ws.send(JSON.stringify({
       type: 'initial_state',
       data: { intersections, alerts, sensors, units },
+      ts: Date.now(),
     }));
     ws.on('message', (raw) => handleClientCommand(ws, wss, raw));
   });
@@ -113,19 +115,19 @@ function attachWebSocket(httpServer) {
 > 💡 **Kesimpulan Inti:** Bayangkan seperti masuk ruang rapat — begitu duduk, langsung dikasih dokumen ringkasan situasi terkini tanpa perlu minta. Begitu juga browser: begitu connect, server langsung kirim semua data (persimpangan, sensor, alert) supaya tampilan langsung terisi penuh.
 
 ```
-📄 web/app.js — Baris 21–54
+📄 web/app.js — Baris 39–68
 ```
 ```javascript
-// Baris 25–44: Koneksi WebSocket dari sisi browser
+// Baris 39–68: Koneksi WebSocket dari sisi browser
 function connectWS() {
-  ws = new WebSocket(WS_URL);                    // Baris 28
-  ws.addEventListener('open', () => {            // Baris 30
+  ws = new WebSocket(WS_URL);                    // Baris 42
+  ws.addEventListener('open', () => {            // Baris 44
     setWsStatus('connected');                    // → dot hijau
   });
-  ws.addEventListener('close', () => {           // Baris 36
+  ws.addEventListener('close', () => {           // Baris 50
     reconnectTimer = setTimeout(connectWS, 3000); // auto-reconnect
   });
-  ws.addEventListener('message', (evt) => {      // Baris 46
+  ws.addEventListener('message', (evt) => {      // Baris 60
     handleMessage(JSON.parse(evt.data));          // → router pesan
   });
 }
@@ -146,13 +148,13 @@ function connectWS() {
 
 **📍 Kode:**
 ```
-📄 web/app.js — Baris 186–267
+📄 web/app.js — Baris 216–297
 ```
 ```javascript
-// Baris 186: fungsi render Chart dipanggil tiap traffic_update
+// Baris 216: fungsi render Chart dipanggil tiap traffic_update
 function renderTrafficChart() {
   const canvas = document.getElementById('traffic-chart');
-  // Baris 229–266: Loop tiap intersection → gambar bar
+  // Baris 259–296: Loop tiap intersection → gambar bar
   entries.forEach((inter, idx) => {
     const cong = Math.min(1, inter.congestion_level || 0);
     let color = '#06b6d4';              // cyan = normal
@@ -165,14 +167,14 @@ function renderTrafficChart() {
 > 💡 **Kesimpulan Inti:** Grafik ini dibuat langsung pakai HTML5 Canvas tanpa plugin tambahan. Warnanya berubah otomatis tergantung data `congestion_level` yang datang dari WebSocket — semakin tinggi nilainya, semakin merah batangnya.
 
 ```
-📄 web/app.js — Baris 81–93 (trigger render dari WebSocket)
+📄 web/app.js — Baris 101–116 (trigger render dari WebSocket)
 ```
 ```javascript
-case 'traffic_update': {              // Baris 81
+case 'traffic_update': {              // Baris 101
   state.intersections[u.intersection_id] = { ...u };
-  renderTrafficChart();               // Baris 89 → update chart
-  renderIntersections();              // Baris 90 → update grid
-  logActivity('TRAFFIC', ...);        // Baris 92 → update log
+  renderTrafficChart();               // Baris 109 → update chart
+  renderIntersections();              // Baris 110 → update grid
+  logActivity('TRAFFIC', ...);        // Baris 114 → update log
 }
 ```
 > 💡 **Kesimpulan Inti:** Satu pesan WebSocket `traffic_update` langsung menggerakkan tiga bagian tampilan sekaligus — grafik, daftar persimpangan, dan log. Inilah yang disebut event-driven: satu sinyal, banyak yang bereaksi.
@@ -183,14 +185,14 @@ case 'traffic_update': {              // Baris 81
 
 **📍 Kode:**
 ```
-📄 web/app.js — Baris 270–295
+📄 web/app.js — Baris 300–325
 ```
 ```javascript
-// Baris 270: fungsi render grid
+// Baris 300: fungsi render grid
 function renderIntersections() {
-  // Baris 278: sort dari congestion tertinggi
+  // Baris 308: sort dari congestion tertinggi
   entries.sort((a, b) => (b.congestion_level||0) - (a.congestion_level||0));
-  // Baris 280–294: generate HTML tiap baris: light dot + nama + bar + count
+  // Baris 310–324: generate HTML tiap baris: light dot + nama + bar + count
   grid.innerHTML = entries.map(i => `
     <div class="int-row">
       <div class="int-light light-${i.current_light}"></div>
@@ -208,19 +210,19 @@ function renderIntersections() {
 
 **📍 Kode:**
 ```
-📄 web/app.js — Baris 298–320
+📄 web/app.js — Baris 329–350
 ```
 ```javascript
-// Baris 299: dipanggil dari setiap case di handleMessage()
+// Baris 329: dipanggil dari setiap case di handleMessage()
 function logActivity(label, message, level = 'info') {
   const item = document.createElement('div');
-  item.className = `log-entry log-${level}`;   // Baris 305: warna per level
+  item.className = `log-entry log-${level}`;   // Baris 335: warna per level
   item.innerHTML = `
     <span class="log-ts">${ts}</span>
     <span class="log-label">${label}</span>
     <span class="log-msg">${message}</span>`;
-  log.prepend(item);   // Baris 311: newest di atas
-  // Baris 314–315: flash effect 1 detik
+  log.prepend(item);   // Baris 341: newest di atas
+  // Baris 344–345: flash effect 1 detik
   item.style.backgroundColor = 'var(--border-bright)';
   setTimeout(() => { item.style.backgroundColor = ''; }, 1000);
 }
@@ -241,7 +243,7 @@ function logActivity(label, message, level = 'info') {
 
 **📍 Kode — Heartbeat (proactive push tiap 15 detik):**
 ```
-📄 server/websocketBridge.js — Baris 119–152
+📄 server/websocketBridge.js — Baris 119–154
 ```
 ```javascript
 // Baris 119–120: setInterval 15 detik — tidak ada trigger dari browser
@@ -252,7 +254,7 @@ function startServerPush(wss) {
     const activeAlerts = store.getActiveAlerts();        // Baris 124
     const avgAqi = /* hitung rata-rata AQI sensor */;   // Baris 126–128
 
-    broadcast(wss, 'system_heartbeat', {                 // Baris 130
+    broadcast(wss, 'system_heartbeat', {                 // Baris 131
       intersections_total: intersections.length,
       congested_count: congested,
       active_alerts: activeAlerts.length,
@@ -260,7 +262,7 @@ function startServerPush(wss) {
       server_time: new Date().toISOString(),
     });
 
-    // Baris 139–150: jika ada alert CRITICAL, push ulang proaktif
+    // Baris 140–152: jika ada alert CRITICAL, push ulang proaktif
     activeAlerts.filter(a => a.severity === 'CRITICAL').forEach(a => {
       broadcast(wss, 'server_alert', { title: '⚠️ CRITICAL SITUATION ONGOING', ... });
     });
@@ -271,7 +273,7 @@ function startServerPush(wss) {
 
 **📍 Kode — Proactive alert saat gRPC emergency stream:**
 ```
-📄 server/websocketBridge.js — Baris 69–83
+📄 server/websocketBridge.js — Baris 70–84
 ```
 ```javascript
 // Baris 70: subscribe gRPC SubscribeAlerts stream
@@ -279,7 +281,7 @@ emergencyStream = emergencyClient.SubscribeAlerts({ zone: 'ALL', min_severity: '
 emergencyStream.on('data', (event) => {
   broadcast(wss, 'emergency_event', event);           // Baris 72: broadcast normal
 
-  // Baris 73–83: jika HIGH/CRITICAL → push server_alert TAMBAHAN (proaktif)
+  // Baris 74–83: jika HIGH/CRITICAL → push server_alert TAMBAHAN (proaktif)
   if (event.severity === 'HIGH' || event.severity === 'CRITICAL') {
     broadcast(wss, 'server_alert', {
       title: `🚨 ${event.severity} ALERT`,
@@ -293,21 +295,18 @@ emergencyStream.on('data', (event) => {
 
 **📍 Kode — Handler di browser:**
 ```
-📄 web/app.js — Baris 131–150
+📄 web/app.js — Baris 165–181
 ```
 ```javascript
-case 'server_alert': {                                 // Baris 131
-  showToast(sa.title, sa.message, sa.details, sa.severity);  // Baris 133
-  logActivity('PROACTIVE', `📡 ${sa.title}`, ...);    // Baris 134
-  state.totalAlerts++;                                 // Baris 135
-  badge.textContent = state.totalAlerts;               // Baris 137: angka di bel
+case 'server_alert': {                                 // Baris 165
+  showToast(sa.title, sa.message, sa.details, sa.severity);  // Baris 167
+  logActivity('PROACTIVE', `📡 ${sa.title}`, ...);    // Baris 168
+  state.totalAlerts++;                                 // Baris 169
+  badge.textContent = state.totalAlerts;               // Baris 171: angka di bel
 }
 
-case 'system_heartbeat': {                             // Baris 142
-  document.getElementById('kpi-intersections-val').textContent = hb.intersections_total; // Baris 145
-  document.getElementById('kpi-congested-val').textContent = hb.congested_count;
-  document.getElementById('kpi-alerts-val').textContent = hb.active_alerts;
-  document.getElementById('kpi-aqi-val').textContent = hb.avg_aqi;
+case 'system_heartbeat': {                             // Baris 176
+  updateKpis();                                        // Baris 179: Refresh KPI dari state lokal
 }
 ```
 > 💡 **Kesimpulan Inti:** Pesan `server_alert` dan `system_heartbeat` adalah dua contoh data yang seluruhnya diprakarsai server — browser tidak pernah memintanya. Ini beda dengan website biasa di mana browser harus terus polling (tanya berulang) untuk tahu ada data baru.
@@ -328,22 +327,22 @@ case 'system_heartbeat': {                             // Baris 142
 
 **📍 Kode — Kirim command dari browser:**
 ```
-📄 web/app.js — Baris 56–63
+📄 web/app.js — Baris 70–77
 ```
 ```javascript
-// Baris 56: satu fungsi untuk semua command
+// Baris 70: satu fungsi untuk semua command
 function sendCommand(command, params = {}) {
-  ws.send(JSON.stringify({ command, params }));  // Baris 61: kirim via WebSocket
+  ws.send(JSON.stringify({ command, params }));  // Baris 75: kirim via WebSocket
   setCmdOutput(`▶ Uplink: ${command.toUpperCase()}`, '');
 }
 ```
 > 💡 **Kesimpulan Inti:** Cukup satu fungsi `sendCommand()` untuk semua jenis perintah. Browser tidak perlu tahu apapun tentang gRPC — cukup kirim pesan JSON sederhana lewat WebSocket, dan Bridge yang mengurus sisanya.
 
 ```
-📄 web/app.js — Baris 590–597 (event listener tombol)
+📄 web/app.js — Baris 819–826 (event listener tombol)
 ```
 ```javascript
-// Baris 590: klik tombol UPDATE LIGHT
+// Baris 819: klik tombol UPDATE LIGHT
 document.getElementById('btn-update-light').addEventListener('click', () => {
   sendCommand('update_traffic_light', {
     intersection_id: document.getElementById('cmd-intersection-id').value,
@@ -357,15 +356,15 @@ document.getElementById('btn-update-light').addEventListener('click', () => {
 
 **📍 Kode — Bridge terima command → panggil gRPC:**
 ```
-📄 server/websocketBridge.js — Baris 156–193
+📄 server/websocketBridge.js — Baris 158–306
 ```
 ```javascript
-// Baris 156: handler semua command dari browser
+// Baris 158: handler semua command dari browser
 function handleClientCommand(ws, wss, raw) {
-  const { command, params } = JSON.parse(raw);   // Baris 160
+  const { command, params = {} } = msg;   // Baris 162
 
   switch (command) {
-    // Baris 173–193: command update_traffic_light
+    // Baris 175–195: command update_traffic_light
     case 'update_traffic_light':
       trafficClient.UpdateTrafficLight({          // ← gRPC Unary call
         intersection_id: params.intersection_id,
@@ -374,13 +373,13 @@ function handleClientCommand(ws, wss, raw) {
         reason: params.reason || 'WebUI Override',
       }, (err, res) => {
         ws.send(JSON.stringify({ type: 'cmd_result', data: { command, result: res } }));
-        broadcast(wss, 'server_alert', {          // Baris 184: notif ke semua
+        broadcast(wss, 'server_alert', {          // Baris 186: notif ke semua
           title: '🚦 Traffic Light Updated', ...
         });
       });
       break;
 
-    // Baris 222–238: command create_alert → gRPC EmergencyService
+    // Baris 224–240: command create_alert → gRPC EmergencyService
     case 'create_alert':
       emergencyClient.CreateAlert({ ... }, (err, res) => {
         ws.send(JSON.stringify({ type: 'cmd_result', data: { command, result: res } }));
@@ -389,7 +388,7 @@ function handleClientCommand(ws, wss, raw) {
   }
 }
 ```
-> 💡 **Kesimpulan Inti:** `handleClientCommand()` adalah penerjemah antara WebSocket dan gRPC. Ia menerima pesan sederhana dari browser, mencari tahu gRPC mana yang harus dipanggil, menjalankannya, lalu mengirim hasilnya kembali ke browser. Browser tidak pernah bersentuhan langsung dengan gRPC.
+> 💡 **Kesimpulan Inti:** `handleClientCommand()` adalah penerjemah antara WebSocket and gRPC. Ia menerima pesan sederhana dari browser, mencari tahu gRPC mana yang harus dipanggil, menjalankannya, lalu mengirim hasilnya kembali ke browser. Browser tidak pernah bersentuhan langsung dengan gRPC.
 
 **📍 Kode — gRPC service handler di backend:**
 ```
@@ -408,19 +407,19 @@ UpdateTrafficLight(call, callback) {
   callback(null, { success: true, previous_light: result.previousLight, ... }); // Baris 78
 }
 ```
-> 💡 **Kesimpulan Inti:** Handler gRPC bertugas memeriksa apakah data yang dikirim sudah benar (validasi), baru kemudian menyimpannya ke store dan mengembalikan jawaban. Kodenya bersih karena tidak ada urusan dengan WebSocket sama sekali.
+> 💡 **Kesimpulan Inti:** Handler gRPC bertugas memeriksa apakah data yang dikirim sudah benar (validasi), baru kemudian menyimpannya ke store and mengembalikan jawaban. Kodenya bersih karena tidak ada urusan dengan WebSocket sama sekali.
 
 **📍 Kode — Store update + emit event (trigger stream):**
 ```
-📄 server/store/inMemoryStore.js — Baris 233–261
+📄 server/store/inMemoryStore.js — Baris 239–270
 ```
 ```javascript
-// Baris 233: updateTrafficLight di store
+// Baris 239: updateTrafficLight di store
 updateTrafficLight(id, newLight, durationSeconds, reason) {
-  intersection.current_light = newLight;         // Baris 238: update state
-  intersection.manual_until = Date.now() + (durationSeconds * 1000); // Baris 243
+  intersection.current_light = newLight;         // Baris 244: update state
+  intersection.manual_until = Date.now() + (durationSeconds * 1000); // Baris 249
 
-  this.emit('traffic_update', {                  // Baris 248: emit event
+  this.emit('traffic_update', {                  // Baris 254: emit event
     intersection_id: id,
     event_type: 'LIGHT_CHANGE',
     current_light: newLight,
@@ -472,29 +471,29 @@ service EmergencyService {
 
 ### 2. InMemoryStore — Event Source
 ```
-📄 server/store/inMemoryStore.js — Baris 9 & 148–202
+📄 server/store/inMemoryStore.js — Baris 9 & 150–225
 ```
 ```javascript
 // Baris 9: extends EventEmitter — kunci arsitektur event-driven
 class InMemoryStore extends EventEmitter {
 
-  // Baris 148: simulasi otomatis tanpa trigger dari luar
+  // Baris 150: simulasi otomatis tanpa trigger dari luar
   _startSimulation() {
-    setInterval(() => {                        // Baris 150: tiap 5 detik
-      intersection.vehicle_count += delta;     // Baris 158: update acak
-      intersection.congestion_level = ...;    // Baris 159
-      this.emit('traffic_update', { ... });   // Baris 189: trigger stream
+    setInterval(() => {                        // Baris 152: tiap 5 detik
+      intersection.vehicle_count = ...;     // Baris 160: update acak
+      intersection.congestion_level = ...;    // Baris 161
+      this.emit('traffic_update', { ... });   // Baris 193: trigger stream
     }, 5000);
 
-    setInterval(() => {                        // Baris 205: tiap 3 detik
-      sensor.value = newVal.value;            // Baris 212: update sensor
+    setInterval(() => {                        // Baris 211: tiap 3 detik
+      sensor.value = newVal.value;            // Baris 218: update sensor
     }, 3000);
   }
 
-  // Baris 302–316: Cross-service orchestration
-  // createIncident() HIGH/CRITICAL → otomatis panggil createAlert()
+  // Baris 312–325: Cross-service orchestration
+  // createIncident() → otomatis panggil createAlert()
   if (data.severity === 'HIGH' || data.severity === 'CRITICAL') {
-    this.createAlert({ type: 'MEDICAL', ... }); // Baris 306: auto emergency alert
+    this.createAlert({ ... }); // Baris 314: auto emergency alert
   }
 }
 ```
@@ -547,20 +546,20 @@ function startGrpcStreams(wss) {
 
 ### 4. web/app.js — Event Router Browser
 ```
-📄 web/app.js — Baris 66–181
+📄 web/app.js — Baris 80–211
 ```
 ```javascript
-// Baris 66: satu router untuk semua tipe pesan WebSocket
+// Baris 80: satu router untuk semua tipe pesan WebSocket
 function handleMessage(msg) {
   switch (msg.type) {
-    case 'initial_state':    // Baris 69 → renderAll() + populateSelects()
-    case 'traffic_update':   // Baris 81 → renderTrafficChart() + renderIntersections() + logActivity()
-    case 'emergency_event':  // Baris 97 → renderEmergencyAlerts() + showToast() + playAlertSound()
-    case 'sensor_update':    // Baris 123 → renderSensors() + updateKpis()
-    case 'server_alert':     // Baris 131 → showToast() + logActivity() + update badge bel
-    case 'system_heartbeat': // Baris 142 → update 4 KPI value di navbar
-    case 'cmd_result':       // Baris 154 → setCmdOutput() + logActivity()
-    case 'cmd_error':        // Baris 171 → setCmdOutput() error
+    case 'initial_state':    // Baris 83 → renderAll() + populateSelects()
+    case 'traffic_update':   // Baris 101 → renderTrafficChart() + renderIntersections() + logActivity()
+    case 'emergency_event':  // Baris 119 → renderEmergencyAlerts() + showToast() + playAlertSound()
+    case 'sensor_update':    // Baris 156 → renderSensors() + updateKpis()
+    case 'server_alert':     // Baris 165 → showToast() + logActivity() + update badge bel
+    case 'system_heartbeat': // Baris 176 → update 4 KPI value di navbar
+    case 'cmd_result':       // Baris 184 → setCmdOutput() + logActivity()
+    case 'cmd_error':        // Baris 201 → setCmdOutput() error
   }
 }
 ```
@@ -574,11 +573,11 @@ function handleMessage(msg) {
 >
 > *✅ WebSocket Implementation — data dari gRPC streaming langsung diteruskan ke browser lewat WebSocket secara otomatis (lihat `websocketBridge.js` baris 50–102)*
 >
-> *✅ Event-Driven UI — tiga bagian tampilan berubah secara dinamis: grafik (baris 186), daftar persimpangan (baris 270), dan log aktivitas (baris 298) di `web/app.js`*
+> *✅ Event-Driven UI — tiga bagian tampilan berubah secara dinamis: grafik (baris 216), daftar persimpangan (baris 300), dan log aktivitas (baris 329) di `web/app.js`*
 >
 > *✅ Server-Initiated Events — server mengirim heartbeat setiap 15 detik dan notifikasi darurat secara proaktif tanpa diminta browser (lihat `websocketBridge.js` baris 119 dan 74)*
 >
-> *✅ Command & Control Bridge — perintah dari browser dikirim lewat WebSocket lalu dieksekusi sebagai panggilan gRPC di server (lihat `websocketBridge.js` baris 156–303)*
+> *✅ Command & Control Bridge — perintah dari browser dikirim lewat WebSocket lalu dieksekusi sebagai panggilan gRPC di server (lihat `websocketBridge.js` baris 158–306)*
 >
 > *Terima kasih sudah menonton."*
 
@@ -589,18 +588,18 @@ function handleMessage(msg) {
 | Fitur | File | Baris Kunci |
 |---|---|---|
 | WebSocket server attach | `server/webServer.js` | 24–27 |
-| WebSocket connect (browser) | `web/app.js` | 25–54 |
+| WebSocket connect (browser) | `web/app.js` | 39–68 |
 | gRPC stream → WS broadcast | `server/websocketBridge.js` | 50–102 |
-| Server heartbeat push | `server/websocketBridge.js` | 119–152 |
-| Command handler Bridge | `server/websocketBridge.js` | 156–303 |
+| Server heartbeat push | `server/websocketBridge.js` | 119–154 |
+| Command handler Bridge | `server/websocketBridge.js` | 158–306 |
 | gRPC UpdateTrafficLight impl | `server/services/trafficService.js` | 45–85 |
 | gRPC MonitorTraffic stream | `server/services/trafficService.js` | 202–247 |
-| Store emit event | `server/store/inMemoryStore.js` | 248, 289, 550 |
-| Store simulasi otomatis | `server/store/inMemoryStore.js` | 148–218 |
-| Cross-service orchestration | `server/store/inMemoryStore.js` | 302–316 |
-| Message router (browser) | `web/app.js` | 66–181 |
-| Chart render | `web/app.js` | 186–267 |
-| Grid render | `web/app.js` | 270–295 |
-| Activity log render | `web/app.js` | 298–320 |
-| sendCommand (browser) | `web/app.js` | 56–63 |
+| Store emit event | `server/store/inMemoryStore.js` | 254, 297, 576 |
+| Store simulasi otomatis | `server/store/inMemoryStore.js` | 150–225 |
+| Cross-service orchestration | `server/store/inMemoryStore.js` | 312–325 |
+| Message router (browser) | `web/app.js` | 80–211 |
+| Chart render | `web/app.js` | 216–297 |
+| Grid render | `web/app.js` | 300–325 |
+| Activity log render | `web/app.js` | 329–350 |
+| sendCommand (browser) | `web/app.js` | 70–77 |
 | Proto Unary + Streaming | `protos/traffic.proto` | 14–34 |
