@@ -39,7 +39,7 @@ NovaPulse adalah sistem **Smart City Central Nervous System** yang tidak hanya m
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    CityNexus gRPC Server (:50051)                │
+│                    NovaPulse gRPC Server (:50051)                │
 │                                                                   │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────┐  │
 │  │  🚦 Traffic      │  │  🌿 Environment  │  │  🚨 Emergency  │  │

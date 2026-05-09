@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NovaPulse — MQTT Protocol Monitor</title>
+  <meta name="description" content="NovaPulse MQTT Protocol Monitor — Real-time broker telemetry, publisher health, and message inspection." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ╔══════════════════════════════════╗ -->
+  <!-- ║         SVG ICON LIBRARY        ║ -->
+  <!-- ╚══════════════════════════════════╝ -->
+  <svg style="display: none;">
+    <symbol id="icon-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+    </symbol>
+    <symbol id="icon-radio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path>
+    </symbol>
+    <symbol id="icon-traffic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect>
+    </symbol>
+    <symbol id="icon-leaf" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.3c.48.17.98.3 1.34.3C19 20 22 3 22 3c-1 2-8 2.25-13 3.25S2 11.5 2 13.5s1.75 3.75 1.75 3.75"></path>
+    </symbol>
+    <symbol id="icon-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+    </symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </symbol>
+    <symbol id="icon-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line>
+    </symbol>
+    <symbol id="icon-log" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line>
+    </symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>
+    </symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+    </symbol>
+    <symbol id="icon-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+    </symbol>
+    <symbol id="icon-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+    </symbol>
+    <symbol id="icon-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    </symbol>
+    <symbol id="icon-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line>
+    </symbol>
+    <symbol id="icon-server" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line>
+    </symbol>
+    <symbol id="icon-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+    </symbol>
+    <symbol id="icon-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline>
+    </symbol>
+    <symbol id="icon-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+    </symbol>
+  </svg>
+
+  <!-- ╔══════════════════════════════════╗ -->
+  <!-- ║         TOP NAV BAR             ║ -->
+  <!-- ╚══════════════════════════════════╝ -->
+  <div class="topnav-wrapper">
+    <header id="top-nav" class="topnav">
+      <div class="topnav-left">
+        <div class="logo-mark">
+          <svg class="icon" style="color: var(--cyan);"><use href="#icon-radio"></use></svg>
+        </div>
+        <div class="logo-text">
+          <span class="logo-main">NovaPulse</span>
+          <span class="logo-sub">MQTT Protocol Monitor</span>
+        </div>
+      </div>
+      <div class="topnav-center">
+        <div id="ws-status-dot" class="ws-dot disconnected"></div>
+        <span id="broker-status-text" class="ws-label">ESTABLISHING LINK...</span>
+      </div>
+      <div class="topnav-right">
+        <div class="time-block">
+          <span class="time-label">LOCAL TIME</span>
+          <span id="header-time" class="server-time">--:--:--</span>
+        </div>
+      </div>
+    </header>
+  </div>
+
+  <!-- ╔══════════════════════════════════╗ -->
+  <!-- ║         KPI STRIP               ║ -->
+  <!-- ╚══════════════════════════════════╝ -->
+  <section id="kpi-strip" class="kpi-strip">
+    <div class="kpi-card">
+      <div class="kpi-icon-wrap"><svg class="icon"><use href="#icon-send"></use></svg></div>
+      <div class="kpi-body">
+        <div class="kpi-value" id="stat-messages">0</div>
+        <div class="kpi-label">Messages</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon-wrap icon-cyan"><svg class="icon"><use href="#icon-activity"></use></svg></div>
+      <div class="kpi-body">
+        <div class="kpi-value value-cyan" id="stat-throughput">0<span class="stat-unit">/s</span></div>
+        <div class="kpi-label">Throughput</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon-wrap icon-purple"><svg class="icon"><use href="#icon-layers"></use></svg></div>
+      <div class="kpi-body">
+        <div class="kpi-value value-purple" id="stat-topics">0</div>
+        <div class="kpi-label">Topics</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon-wrap icon-orange"><svg class="icon"><use href="#icon-link"></use></svg></div>
+      <div class="kpi-body">
+        <div class="kpi-value value-orange" id="stat-retained">0</div>
+        <div class="kpi-label">Retained</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon-wrap icon-red"><svg class="icon"><use href="#icon-shield"></use></svg></div>
+      <div class="kpi-body">
+        <div class="kpi-value value-red" id="stat-qos2">0</div>
+        <div class="kpi-label">QoS 2 (Exact)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ╔══════════════════════════════════╗ -->
+  <!-- ║          MAIN GRID              ║ -->
+  <!-- ╚══════════════════════════════════╝ -->
+  <main class="main-grid">
+    <!-- ── Publisher Health Matrix ──────────────────────────────── -->
+    <section class="card card-publishers" aria-label="Publisher Health">
+      <div class="card-header">
+        <div class="card-title-group">
+          <svg class="icon-sm"><use href="#icon-server"></use></svg>
+          <span class="card-title">Publisher Health Matrix</span>
+        </div>
+        <span class="card-badge live-pulse">TELEMETRY</span>
+      </div>
+      <div class="publisher-grid">
+        <div class="publisher-card" id="pub-traffic">
+          <div class="pub-header">
+            <svg class="icon-sm pub-icon-svg"><use href="#icon-traffic"></use></svg>
+            <span class="pub-name">Traffic Sensor</span>
+            <span class="pub-status offline" id="pub-traffic-status"></span>
+          </div>
+          <div class="pub-stats">
+            <div class="pub-stat"><span class="pub-stat-val" id="pub-traffic-count">0</span><span class="pub-stat-lbl">SENT</span></div>
+            <div class="pub-stat"><span class="pub-stat-val" id="pub-traffic-rate">0/s</span><span class="pub-stat-lbl">RATE</span></div>
+          </div>
+          <div class="pub-lwt" id="pub-traffic-lwt">LWT: STANDBY</div>
+        </div>
+        <div class="publisher-card" id="pub-environment">
+          <div class="pub-header">
+            <svg class="icon-sm pub-icon-svg"><use href="#icon-leaf"></use></svg>
+            <span class="pub-name">Environment IoT</span>
+            <span class="pub-status offline" id="pub-environment-status"></span>
+          </div>
+          <div class="pub-stats">
+            <div class="pub-stat"><span class="pub-stat-val" id="pub-environment-count">0</span><span class="pub-stat-lbl">SENT</span></div>
+            <div class="pub-stat"><span class="pub-stat-val" id="pub-environment-rate">0/s</span><span class="pub-stat-lbl">RATE</span></div>
+          </div>
+          <div class="pub-lwt" id="pub-environment-lwt">LWT: STANDBY</div>
+        </div>
+        <div class="publisher-card" id="pub-emergency">
+          <div class="pub-header">
+            <svg class="icon-sm pub-icon-svg"><use href="#icon-shield"></use></svg>
+            <span class="pub-name">Emergency Dispatch</span>
+            <span class="pub-status offline" id="pub-emergency-status"></span>
+          </div>
+          <div class="pub-stats">
+            <div class="pub-stat"><span class="pub-stat-val" id="pub-emergency-count">0</span><span class="pub-stat-lbl">SENT</span></div>
+            <div class="pub-stat"><span class="pub-stat-val" id="pub-emergency-rate">0/s</span><span class="pub-stat-lbl">RATE</span></div>
+          </div>
+          <div class="pub-lwt" id="pub-emergency-lwt">LWT: STANDBY</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── MQTT 5.0 Feature Matrix ─────────────────────────────── -->
+    <section class="card card-features" aria-label="MQTT Features">
+      <div class="card-header">
+        <div class="card-title-group">
+          <svg class="icon-sm"><use href="#icon-settings"></use></svg>
+          <span class="card-title">MQTT 5.0 Feature Matrix</span>
+        </div>
+        <span class="card-badge badge-purple">PROTOCOL</span>
+      </div>
+      <div class="features-grid">
+        <div class="feature-item" id="feat-pubsub"><span class="feat-icon"><svg class="icon-feat"><use href="#icon-check"></use></svg></span> Pub/Sub & QoS</div>
+        <div class="feature-item" id="feat-wildcard"><span class="feat-icon"><svg class="icon-feat"><use href="#icon-clock"></use></svg></span> Wildcard</div>
+        <div class="feature-item" id="feat-alias"><span class="feat-icon"><svg class="icon-feat"><use href="#icon-clock"></use></svg></span> Topic Alias</div>
+        <div class="feature-item" id="feat-userprops"><span class="feat-icon"><svg class="icon-feat"><use href="#icon-clock"></use></svg></span> User Properties</div>
+        <div class="feature-item" id="feat-retain"><span class="feat-icon"><svg class="icon-feat"><use href="#icon-clock"></use></svg></span> Retain</div>
+        <div class="feature-item" id="feat-expiry"><span class="feat-icon"><svg class="icon-feat"><use href="#icon-clock"></use></svg></span> Expiry</div>
+        <div class="feature-item" id="feat-lwt"><span class="feat-icon"><svg class="icon-feat"><use href="#icon-clock"></use></svg></span> Last Will (LWT)</div>
+        <div class="feature-item" id="feat-reqres"><span class="feat-icon"><svg class="icon-feat"><use href="#icon-clock"></use></svg></span> Request-Response</div>
+        <div class="feature-item" id="feat-shared"><span class="feat-icon"><svg class="icon-feat"><use href="#icon-clock"></use></svg></span> Shared Sub</div>
+        <div class="feature-item" id="feat-flowctrl"><span class="feat-icon"><svg class="icon-feat"><use href="#icon-check"></use></svg></span> Flow Control</div>
+      </div>
+    </section>
+
+    <!-- ── QoS Distribution ────────────────────────────────────── -->
+    <section class="card card-qos" aria-label="QoS Distribution">
+      <div class="card-header">
+        <div class="card-title-group">
+          <svg class="icon-sm"><use href="#icon-chart"></use></svg>
+          <span class="card-title">QoS Distribution Analysis</span>
+        </div>
+        <span class="card-badge live-pulse">LIVE</span>
+      </div>
+      <div class="qos-bars">
+        <div class="qos-row">
+          <span class="qos-label">QoS 0</span>
+          <div class="qos-bar-track"><div class="qos-bar qos0" id="qos-bar-0" style="width:0%"></div></div>
+          <span class="qos-count" id="qos-count-0">0</span>
+        </div>
+        <div class="qos-row">
+          <span class="qos-label">QoS 1</span>
+          <div class="qos-bar-track"><div class="qos-bar qos1" id="qos-bar-1" style="width:0%"></div></div>
+          <span class="qos-count" id="qos-count-1">0</span>
+        </div>
+        <div class="qos-row">
+          <span class="qos-label">QoS 2</span>
+          <div class="qos-bar-track"><div class="qos-bar qos2" id="qos-bar-2" style="width:0%"></div></div>
+          <span class="qos-count" id="qos-count-2">0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Command & Control ───────────────────────────────────── -->
+    <section class="card card-command" aria-label="MQTT Command Center">
+      <div class="card-header">
+        <div class="card-title-group">
+          <svg class="icon-sm"><use href="#icon-bolt"></use></svg>
+          <span class="card-title">Command & Control Interface</span>
+        </div>
+        <span class="card-badge badge-purple">MQTT BRIDGE</span>
+      </div>
+      <div class="controls-grid">
+        <button class="btn btn-primary" id="btn-send-command" onclick="sendCommand()">
+          <svg class="icon-sm"><use href="#icon-send"></use></svg> SEND COMMAND
+        </button>
+        <button class="btn btn-danger" id="btn-burst" onclick="burstTest()">
+          <svg class="icon-sm"><use href="#icon-zap"></use></svg> BURST TEST
+        </button>
+        <button class="btn btn-ghost" id="btn-clear-feed" onclick="clearFeed()">
+          <svg class="icon-sm"><use href="#icon-trash"></use></svg> PURGE FEED
+        </button>
+        <button class="btn btn-primary" id="btn-publish-test" onclick="publishTestMessage()" style="background: var(--cyan); color: #fff;">
+          <svg class="icon-sm"><use href="#icon-upload"></use></svg> PUBLISH TEST
+        </button>
+      </div>
+      <div class="cmd-output" id="command-output" role="status" aria-live="polite">SYSTEM READY</div>
+    </section>
+
+    <!-- ── Live Message Feed ───────────────────────────────────── -->
+    <section class="card card-feed" aria-label="Message Feed">
+      <div class="card-header">
+        <div class="card-title-group">
+          <svg class="icon-sm"><use href="#icon-log"></use></svg>
+          <span class="card-title">Live Message Feed</span>
+        </div>
+        <span class="card-badge live-pulse" id="feed-count">0 MESSAGES</span>
+      </div>
+      <div class="feed-filters">
+        <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">ALL</button>
+        <button class="filter-btn" data-filter="traffic" onclick="setFilter('traffic')">
+          <svg class="icon-sm"><use href="#icon-traffic"></use></svg> TRAFFIC
+        </button>
+        <button class="filter-btn" data-filter="environment" onclick="setFilter('environment')">
+          <svg class="icon-sm"><use href="#icon-leaf"></use></svg> ENV
+        </button>
+        <button class="filter-btn" data-filter="emergency" onclick="setFilter('emergency')">
+          <svg class="icon-sm"><use href="#icon-shield"></use></svg> EMERGENCY
+        </button>
+        <button class="filter-btn" data-filter="system" onclick="setFilter('system')">
+          <svg class="icon-sm"><use href="#icon-settings"></use></svg> SYSTEM
+        </button>
+      </div>
+      <div class="message-feed" id="message-feed">
+        <div class="feed-empty">
+          <div class="empty-state-v2">
+            <div class="radar-container">
+              <svg class="icon-lg"><use href="#icon-radio"></use></svg>
+              <div class="radar-ping"></div>
+              <div class="radar-ping" style="animation-delay: 0.7s;"></div>
+            </div>
+            <div class="empty-title">SCANNING CHANNELS</div>
+            <div class="empty-desc">Waiting for MQTT broker connection and publisher telemetry...</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/mqtt@4.3.8/dist/mqtt.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
