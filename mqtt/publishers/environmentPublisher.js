@@ -16,14 +16,14 @@ const CLIENT_ID = 'novapulse-environment-publisher';
 
 // ── Simulated sensors ───────────────────────────────────────────────────────
 const sensors = [
-  { id: 'SNS-001', name: 'AQ-Sensor Sudirman', type: 'air_quality', zone: 'CENTRAL', value: 72, unit: 'AQI' },
-  { id: 'SNS-002', name: 'Temp-Sensor Thamrin', type: 'temperature', zone: 'CENTRAL', value: 32.5, unit: '°C' },
-  { id: 'SNS-003', name: 'Humidity-Sensor Kemang', type: 'humidity', zone: 'SOUTH', value: 65, unit: '%' },
-  { id: 'SNS-004', name: 'Noise-Sensor Mangga Dua', type: 'noise', zone: 'NORTH', value: 55, unit: 'dB' },
-  { id: 'SNS-005', name: 'Water-Sensor Ciliwung', type: 'water_quality', zone: 'CENTRAL', value: 44, unit: 'WQI' },
-  { id: 'SNS-006', name: 'AQ-Sensor Kuningan', type: 'air_quality', zone: 'EAST', value: 88, unit: 'AQI' },
-  { id: 'SNS-007', name: 'Temp-Sensor Kemayoran', type: 'temperature', zone: 'NORTH', value: 34, unit: '°C' },
-  { id: 'SNS-008', name: 'Noise-Sensor Blok M', type: 'noise', zone: 'SOUTH', value: 68, unit: 'dB' },
+  { id: 'SNS-001', name: 'AQ-Sensor Shinjuku', type: 'air_quality', zone: 'CENTRAL', value: 72, unit: 'AQI' },
+  { id: 'SNS-002', name: 'Temp-Sensor Shibuya', type: 'temperature', zone: 'WEST', value: 32.5, unit: '°C' },
+  { id: 'SNS-003', name: 'Humidity-Sensor Roppongi', type: 'humidity', zone: 'SOUTH', value: 65, unit: '%' },
+  { id: 'SNS-004', name: 'Noise-Sensor Ginza', type: 'noise', zone: 'EAST', value: 55, unit: 'dB' },
+  { id: 'SNS-005', name: 'Water-Sensor Sumida River', type: 'water_quality', zone: 'EAST', value: 44, unit: 'WQI' },
+  { id: 'SNS-006', name: 'AQ-Sensor Akihabara', type: 'air_quality', zone: 'NORTH', value: 88, unit: 'AQI' },
+  { id: 'SNS-007', name: 'Temp-Sensor Asakusa', type: 'temperature', zone: 'EAST', value: 34, unit: '°C' },
+  { id: 'SNS-008', name: 'Noise-Sensor Ueno', type: 'noise', zone: 'NORTH', value: 68, unit: 'dB' },
 ];
 
 const thresholds = {

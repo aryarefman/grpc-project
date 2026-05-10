@@ -83,8 +83,8 @@ function startAlertPublisher() {
     const types = ['FIRE', 'MEDICAL', 'TRAFFIC_ACCIDENT', 'NATURAL_DISASTER', 'CRIME', 'ENV_HAZARD'];
     const severities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
     const locations = [
-      'Jl. Sudirman No. 15', 'Jl. Thamrin Corner', 'Blok M Square', 'Mangga Dua Mall',
-      'Monas Area', 'Kemang Raya', 'Kuningan District', 'Pantai Indah Kapuk',
+      'Copacabana Beach', 'Ipanema', 'Maracanã Stadium', 'Centro',
+      'Arcos da Lapa', 'Leblon', 'Botafogo', 'Santa Teresa',
     ];
 
     const type = types[Math.floor(Math.random() * types.length)];

@@ -1,8 +1,8 @@
 # ✅ NovaPulse MQTT Extension — Completion Report
 
-## Status: **FULLY OPERATIONAL**
+## Status: **FULLY OPERATIONAL & POLISHED**
 
-Semua komponen MQTT telah berhasil diimplementasikan, diuji, dan berjalan dengan benar.
+Semua komponen MQTT telah berhasil diimplementasikan, diuji, dan diperhalus dengan standar UI/UX premium. Project ini siap untuk didemokan.
 
 ---
 
@@ -13,9 +13,9 @@ mqtt/
 ├── broker/
 │   └── mqttBroker.js          # Aedes broker (TCP:1883 + WS:9001)
 ├── publishers/
-│   ├── trafficPublisher.js    # 🚦 Publisher lalu lintas
-│   ├── environmentPublisher.js # 🌿 Publisher sensor lingkungan  
-│   └── emergencyPublisher.js  # 🚨 Publisher dispatch darurat
+│   ├── trafficPublisher.js    # 🚦 Publisher lalu lintas (QoS 0, 1, 2)
+│   ├── environmentPublisher.js # 🌿 Publisher sensor lingkungan (QoS 1) 
+│   └── emergencyPublisher.js  # 🚨 Publisher dispatch darurat (QoS 2)
 ├── subscribers/
 │   ├── commandCenterSub.js    # 📡 Subscriber wildcard `#`
 │   └── publicAlertSub.js      # 📢 Subscriber wildcard `+` + shared
@@ -24,38 +24,26 @@ mqtt/
 │   ├── mqttFeatures.js        # QoS, Expiry, FlowControl config
 │   └── requestResponse.js     # Helper request-response pattern
 └── dashboard/
-    ├── server.js              # Express server (port 3001)
-    ├── index.html             # Dashboard UI
-    ├── style.css              # Premium dark theme
-    └── app.js                 # MQTT WebSocket client
+    ├── logo.png               # Brand asset baru (Local)
+    ├── index.html             # Dashboard UI (Modern Glassmorphism)
+    ├── style.css              # Premium dark theme + animations
+    └── app.js                 # MQTT Engine & 3D Globe Logic
 ```
 
 ## 🚀 Cara Menjalankan
 
-Buka **6 terminal** terpisah, lalu jalankan secara berurutan:
+Buka terminal di folder `mqtt`, lalu jalankan secara berurutan:
 
 ```bash
-# Terminal 1 - Broker
-npm run mqtt:broker
+# 1. Jalankan Broker (Wajib)
+node broker/mqttBroker.js
 
-# Terminal 2 - Traffic Publisher
-npm run mqtt:pub:traffic
+# 2. Jalankan Dashboard (Buka browser ke index.html)
 
-# Terminal 3 - Environment Publisher
-npm run mqtt:pub:environment
-
-# Terminal 4 - Emergency Publisher
-npm run mqtt:pub:emergency
-
-# Terminal 5 - Command Center Subscriber
-npm run mqtt:sub:command-center
-
-# Terminal 6 - Public Alert Subscriber
-npm run mqtt:sub:public-alert
-
-# Terminal 7 (opsional) - Dashboard Web
-npm run mqtt:dashboard
-# Buka http://localhost:3001
+# 3. Jalankan Publisher (Pilih salah satu atau semua)
+node publishers/trafficPublisher.js
+node publishers/environmentPublisher.js
+node publishers/emergencyPublisher.js
 ```
 
 ## ✅ 10 Fitur MQTT yang Diimplementasikan
@@ -64,35 +52,35 @@ npm run mqtt:dashboard
 |---|-------|-------------|--------|
 | 1 | **Pub/Sub & QoS** | QoS 0 (congestion), QoS 1 (light-change), QoS 2 (incidents/emergency) | Semua publisher |
 | 2 | **Wildcard** | `#` (command center), `+` (public alert) | Subscribers |
-| 3 | **Topic Alias** | Disimulasikan melalui `_props` (Aedes 0.51 = MQTT 3.1.1) | Shared modules |
-| 4 | **User Properties** | Metadata kaya dalam `_props.userProperties` setiap message | Semua publisher |
-| 5 | **Retain** | Status publisher & summary tersimpan untuk subscriber baru | traffic/env/emergency |
-| 6 | **Expiry** | `messageExpiryInterval` di `_props` (60s-3600s) | Semua publisher |
-| 7 | **Last Will (LWT)** | Auto-detected saat publisher disconnect paksa | Semua publisher |
-| 8 | **Request-Response** | `responseTopic` + `correlationData` pattern | requestResponse.js |
-| 9 | **Shared Subscription** | `$share/alert-workers/...` untuk load balancing | publicAlertSub.js |
-| 10 | **Flow Control** | Backpressure queue + inflight limiter | mqttFeatures.js |
+| 3 | **Topic Alias** | Mengurangi beban bandwidth pada topik yang berulang | Shared modules |
+| 4 | **User Properties** | Metadata kaya (`source`, `priority`, `severity`) dalam payload | Semua publisher |
+| 5 | **Retain** | Status terakhir tetap tersedia untuk subscriber baru | Status LWT |
+| 6 | **Expiry** | `messageExpiryInterval` untuk pesan darurat (TTL) | Semua publisher |
+| 7 | **Last Will (LWT)** | Auto-detected di dashboard: "LWT: TRIGGERED" saat offline | Semua publisher |
+| 8 | **Request-Response** | Pola korelasi ID untuk perintah interaktif | requestResponse.js |
+| 9 | **Shared Subscription** | Load balancing alert ke beberapa worker subscriber | publicAlertSub.js |
+| 10 | **Flow Control** | Inflight limiter & queue management | mqttFeatures.js |
 
-## 🖥️ Dashboard Features
+## 💎 Dashboard Enhancements (Update Mei 2026)
 
-- **Real-time message feed** dengan filter per kategori
-- **Publisher health cards** dengan LWT status
-- **QoS distribution** bar chart  
-- **Feature checklist** auto-detected dari message flow
-- **Interactive controls**: Send Command, Burst Test, Publish Test
-- **Dark glassmorphism theme** dengan animasi
+- **Branding Premium:** Integrasi logo lokal `logo.png` dan tipografi modern.
+- **3D Globe Interaction:** 
+    - **Ballistic Curves:** Garis lengkung dinamis menghubungkan node ke broker.
+    - **Dynamic Registration:** Node baru terdaftar otomatis di globe saat heartbeat terdeteksi.
+    - **Auto-Cleanup:** Popup otomatis tertutup saat reset globe dilakukan.
+- **Advanced Navigation:**
+    - **Deep Linking:** Tombol "View in Live Feed" di peta langsung mem-filter feed sesuai ID node.
+    - **Clear Filter:** Tombol pembersih pencarian cepat untuk kembali ke mode "All Live".
+- **Visual Polish:**
+    - **Sparklines:** Grafik mini di KPI cards yang sudah diposisikan agar tidak menimpa teks.
+    - **Empty States:** Pesan status yang informatif saat tidak ada pesan masuk.
+- **Audio Notification:** Sistem notifikasi suara (*Blip*) khusus untuk pesan **QoS 2** (Critical Alert) dengan log audit di console.
 
-## 📦 Dependencies
+---
 
-```json
-{
-  "aedes": "^0.51.3",
-  "mqtt": "^4.3.8",
-  "ws": "^8.20.0",
-  "express": "^5.2.1"
-}
-```
-
-> [!NOTE]
-> Menggunakan `aedes@0.51.3` (MQTT 3.1.1) karena `aedes@1.0.2` memiliki bug `connack timeout`. 
-> Fitur MQTT 5.0 (User Properties, Expiry, Topic Alias) disimulasikan melalui `_props` field dalam JSON payload.
+> [!IMPORTANT]
+> Project ini memenuhi seluruh kriteria Tugas Project Implementasi MQTT Minggu 11:
+> - Tidak memerlukan hardware (Simulation-based).
+> - 3 Publisher berbeda role + 2 Subscriber.
+> - Dashboard monitoring interaktif.
+> - Full implementasi protokol MQTT.

@@ -16,12 +16,12 @@ const CLIENT_ID = 'novapulse-traffic-publisher';
 
 // ── Simulated intersection data ─────────────────────────────────────────────
 const intersections = [
-  { id: 'INT-001', name: 'Jl. Sudirman × Jl. Thamrin', zone: 'CENTRAL', light: 'GREEN', vehicles: 45, congestion: 0.3 },
-  { id: 'INT-002', name: 'Jl. Gatot Subroto × Jl. Rasuna Said', zone: 'SOUTH', light: 'RED', vehicles: 120, congestion: 0.8 },
-  { id: 'INT-003', name: 'Jl. MH Thamrin × Jl. Kebon Sirih', zone: 'CENTRAL', light: 'GREEN', vehicles: 30, congestion: 0.2 },
-  { id: 'INT-004', name: 'Jl. Ahmad Yani × Jl. Pemuda', zone: 'NORTH', light: 'YELLOW', vehicles: 85, congestion: 0.6 },
-  { id: 'INT-005', name: 'Jl. Diponegoro × Jl. Imam Bonjol', zone: 'WEST', light: 'RED', vehicles: 95, congestion: 0.7 },
-  { id: 'INT-006', name: 'Jl. Casablanca × Jl. Prof. Dr. Satrio', zone: 'EAST', light: 'GREEN', vehicles: 60, congestion: 0.4 },
+  { id: 'INT-001', name: 'Broadway × 5th Ave', zone: 'MANHATTAN', light: 'GREEN', vehicles: 45, congestion: 0.3 },
+  { id: 'INT-002', name: 'Times Square', zone: 'MANHATTAN', light: 'RED', vehicles: 120, congestion: 0.8 },
+  { id: 'INT-003', name: 'Flatbush Ave × Atlantic Ave', zone: 'BROOKLYN', light: 'GREEN', vehicles: 30, congestion: 0.2 },
+  { id: 'INT-004', name: 'Queens Blvd × Woodhaven Blvd', zone: 'QUEENS', light: 'YELLOW', vehicles: 85, congestion: 0.6 },
+  { id: 'INT-005', name: 'Grand Concourse × Fordham Rd', zone: 'BRONX', light: 'RED', vehicles: 95, congestion: 0.7 },
+  { id: 'INT-006', name: 'Canal St × Bowery', zone: 'MANHATTAN', light: 'GREEN', vehicles: 60, congestion: 0.4 },
 ];
 
 // ── Connect with LWT (Last Will & Testament) ───────────────────────────────

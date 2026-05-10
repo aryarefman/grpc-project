@@ -25,6 +25,9 @@ const state = {
   feedMessages: [],
 };
 
+let activePopup = null;
+let activePopupNodeId = null;
+
 const MAX_FEED = 200;
 
 // ── SVG icon references (no emojis) ─────────────────────────────────────────
@@ -36,6 +39,499 @@ const ICONS = {
   check: '<svg class="icon-feat" style="color:var(--green)"><use href="#icon-check"></use></svg>',
   clock: '<svg class="icon-feat" style="color:var(--text-faint)"><use href="#icon-clock"></use></svg>',
 };
+
+// ── Mapbox 3D Integration ───────────────────────────────────────────────────
+const _mbt = 'pk.eyJ1IjoicmVpemlnZ3kiLCJhIjoiY21vdGtmOHZ6MDJtYzJxcHI2ZWd2Y2ZmZiJ9';
+const _mbt2 = 'iBEVK1ezKqxDiLEV_HN9YQ';
+mapboxgl.accessToken = `${_mbt}.${_mbt2}`;
+
+const map = new mapboxgl.Map({
+  container: 'mapbox-container',
+  style: 'mapbox://styles/mapbox/satellite-streets-v12', // Realistic satellite map
+  center: [0, 20], // World Center
+  zoom: 1.5,
+  pitch: 0,
+  projection: 'globe', // 3D Globe Projection
+  antialias: true
+});
+
+// ── Audio & Effects ─────────────────────────────────────────────────────────
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+const audioCtx = new AudioContext();
+let soundEnabled = true;
+
+function playBlip(type) {
+  if (!soundEnabled || audioCtx.state === 'suspended') return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+
+    if (type === 'qos2') {
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+      gain.gain.setValueAtTime(0.05, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      osc.start(now);
+      osc.stop(now + 0.1);
+    } else if (type === 'popup') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(400, now);
+      osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      osc.start(now);
+      osc.stop(now + 0.1);
+    }
+  } catch (e) {}
+}
+
+document.body.addEventListener('click', () => {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+}, { once: true });
+
+// ── Globe Auto-Spin ─────────────────────────────────────────────────────────
+const secondsPerRevolution = 120;
+let userInteracting = false;
+let spinEnabled = true;
+
+map.on('mousedown', () => { userInteracting = true; });
+map.on('mouseup', () => { userInteracting = false; });
+map.on('dragstart', () => { userInteracting = true; });
+map.on('dragend', () => { userInteracting = false; });
+map.on('pitchend', () => { userInteracting = false; });
+map.on('rotateend', () => { userInteracting = false; });
+
+function spinGlobe() {
+  const zoom = map.getZoom();
+  if (spinEnabled && !userInteracting && zoom < 5) {
+    let distancePerSecond = 360 / secondsPerRevolution;
+    const center = map.getCenter();
+    center.lng -= distancePerSecond;
+    map.easeTo({ center, duration: 1000, easing: (n) => n });
+  }
+}
+
+map.on('moveend', () => {
+  spinGlobe();
+});
+
+function setupMapFeatures(theme) {
+  if (theme === 'light') {
+    map.setFog({
+      'color': 'rgb(255, 255, 255)',
+      'high-color': 'rgb(200, 220, 240)',
+      'horizon-blend': 0.1,
+      'space-color': 'rgb(150, 180, 220)',
+      'star-intensity': 0.0
+    });
+  } else {
+    map.setFog({
+      'color': 'rgb(24, 24, 24)',
+      'high-color': 'rgb(36, 36, 36)',
+      'horizon-blend': 0.2,
+      'space-color': 'rgb(10, 10, 10)',
+      'star-intensity': 0.8
+    });
+  }
+
+  if (!map.getLayer('3d-buildings')) {
+    map.addLayer({
+      'id': '3d-buildings',
+      'source': 'composite',
+      'source-layer': 'building',
+      'filter': ['==', 'extrude', 'true'],
+      'type': 'fill-extrusion',
+      'minzoom': 15,
+      'paint': {
+        'fill-extrusion-color': theme === 'light' ? '#e5e7eb' : '#1f2937',
+        'fill-extrusion-height': ['get', 'height'],
+        'fill-extrusion-base': ['get', 'min_height'],
+        'fill-extrusion-opacity': 0.6
+      }
+    });
+  }
+}
+
+const mqttNodes = {
+  'broker': { name: 'Aedes MQTT Broker', role: 'Central Hub', lat: 51.5072, lng: -0.1276, color: '#a78bfa', count: 0, marker: null, signal: 4, latency: 0, lastPayload: 'System Active' },
+  'traffic': { name: 'Traffic Publisher', role: 'Publisher', lat: 40.7128, lng: -74.006, color: '#38bdf8', count: 0, marker: null, signal: 3, latency: 45, lastPayload: 'Waiting...' },
+  'environment': { name: 'Environment Publisher', role: 'Publisher', lat: 35.6895, lng: 139.6917, color: '#34d399', count: 0, marker: null, signal: 4, latency: 120, lastPayload: 'Waiting...' },
+  'emergency': { name: 'Emergency Publisher', role: 'Publisher', lat: -22.9068, lng: -43.1729, color: '#f87171', count: 0, marker: null, signal: 2, latency: 310, lastPayload: 'Waiting...' },
+  'command-center': { name: 'Command Center', role: 'Subscriber (#)', lat: -6.1751, lng: 106.8272, color: '#fbbf24', count: 0, marker: null, signal: 4, latency: 12, lastPayload: 'Idle' },
+  'public-alert': { name: 'Public Alert Worker', role: 'Subscriber (+)', lat: -33.8688, lng: 151.2093, color: '#ea580c', count: 0, marker: null, signal: 4, latency: 85, lastPayload: 'Idle' }
+};
+
+
+function initMqttTopology() {
+  const features = [];
+  Object.keys(mqttNodes).forEach(key => {
+    const node = mqttNodes[key];
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [node.lng, node.lat] },
+      properties: {
+        id: key,
+        name: node.name,
+        role: node.role,
+        color: node.color,
+        isBroker: key === 'broker' ? true : false
+      }
+    });
+  });
+
+  if (map.getSource('mqtt-nodes-source')) return;
+
+  map.addSource('mqtt-nodes-source', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: features }
+  });
+
+  // Pulse layer for broker
+  map.addLayer({
+    id: 'mqtt-nodes-pulse',
+    type: 'circle',
+    source: 'mqtt-nodes-source',
+    filter: ['==', 'isBroker', true],
+    paint: {
+      'circle-radius': 15,
+      'circle-color': ['get', 'color'],
+      'circle-opacity': 0.4,
+      'circle-blur': 0.5,
+      'circle-pitch-alignment': 'viewport'
+    }
+  });
+
+  // Solid points
+  map.addLayer({
+    id: 'mqtt-nodes-layer',
+    type: 'circle',
+    source: 'mqtt-nodes-source',
+    paint: {
+      'circle-radius': ['case', ['==', ['get', 'isBroker'], true], 9, 7],
+      'circle-color': ['get', 'color'],
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#ffffff',
+      'circle-pitch-alignment': 'viewport'
+    }
+  });
+
+  // Popup logic
+
+  map.on('click', 'mqtt-nodes-layer', (e) => {
+    const props = e.features[0].properties;
+    
+    // If clicking the same node, close it
+    if (activePopupNodeId === props.id) {
+      if (activePopup) activePopup.remove();
+      activePopup = null;
+      activePopupNodeId = null;
+      return;
+    }
+    
+    // Otherwise open new popup
+    if (activePopup) activePopup.remove();
+    activePopupNodeId = props.id;
+
+    map.flyTo({ center: e.features[0].geometry.coordinates, zoom: 5, pitch: 45 });
+    
+    const popupHtml = `
+      <div class="custom-map-popup">
+        <div class="popup-title" style="color:${props.color}; font-weight: bold; font-size: 1.1rem; padding-right: 24px;">${props.name}</div>
+        <div class="popup-role" style="font-size: 0.65rem; color: var(--text-faint); text-transform: uppercase; margin-bottom: 8px;">${props.role}</div>
+        
+        <div class="popup-stats-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px;">
+          <div class="pop-stat">
+            <div style="font-size: 0.55rem; color: var(--text-faint);">MESSAGES</div>
+            <div id="node-stat-${props.id}" style="font-family: var(--font-mono); font-size: 0.9rem; color: white;">${mqttNodes[props.id].count}</div>
+          </div>
+          <div class="pop-stat">
+            <div style="font-size: 0.55rem; color: var(--text-faint);">LATENCY</div>
+            <div style="font-family: var(--font-mono); font-size: 0.9rem; color: var(--cyan);">${mqttNodes[props.id].latency}ms</div>
+          </div>
+        </div>
+
+        <div style="font-size: 0.55rem; color: var(--text-faint); margin-bottom: 4px;">LAST PAYLOAD</div>
+        <div class="popup-payload" style="font-family: var(--font-mono); font-size: 0.65rem; color: var(--text-muted); background: rgba(0,0,0,0.3); padding: 6px; border-radius: 4px; border-left: 2px solid ${props.color}; word-break: break-all;">
+          ${mqttNodes[props.id].lastPayload}
+        </div>
+
+        <button onclick="scrollToFeed('${props.id}')" style="width: 100%; margin-top: 12px; padding: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 4px; font-size: 0.65rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; font-weight: bold; text-transform: uppercase;">
+          <svg style="width:12px; height:12px; fill: currentColor;"><use href="#icon-log"></use></svg>
+          View in Live Feed
+        </button>
+      </div>
+    `;
+
+    activePopup = new mapboxgl.Popup({ offset: 15, closeButton: true, closeOnClick: true, maxWidth: '280px' })
+      .setLngLat(e.features[0].geometry.coordinates)
+      .setHTML(popupHtml)
+      .addTo(map);
+      
+    activePopup.on('close', () => {
+      if (activePopupNodeId === props.id) {
+        activePopup = null;
+        activePopupNodeId = null;
+      }
+    });
+  });
+
+  map.on('mouseenter', 'mqtt-nodes-layer', () => map.getCanvas().style.cursor = 'pointer');
+  map.on('mouseleave', 'mqtt-nodes-layer', () => map.getCanvas().style.cursor = '');
+  
+  // Pulse animation
+  let radius = 15;
+  let growing = true;
+  function animatePulse() {
+    if (!map.isStyleLoaded()) {
+      requestAnimationFrame(animatePulse);
+      return;
+    }
+    if (growing) {
+      radius += 0.2;
+      if (radius >= 30) growing = false;
+    } else {
+      radius -= 0.2;
+      if (radius <= 15) growing = true;
+    }
+    if (map.getLayer('mqtt-nodes-pulse')) {
+      map.setPaintProperty('mqtt-nodes-pulse', 'circle-radius', radius);
+      map.setPaintProperty('mqtt-nodes-pulse', 'circle-opacity', Math.max(0, 0.6 - (radius - 15) / 25));
+    }
+    requestAnimationFrame(animatePulse);
+  }
+  animatePulse();
+}
+
+function registerDynamicNode(id, category) {
+  if (mqttNodes[id]) return mqttNodes[id];
+
+  // Random global location (avoiding extreme poles)
+  const lat = (Math.random() * 120) - 60;
+  const lng = (Math.random() * 360) - 180;
+  
+  const colors = { traffic: '#38bdf8', environment: '#34d399', emergency: '#f87171', system: '#a78bfa' };
+  
+  mqttNodes[id] = {
+    name: id.toUpperCase().substring(0, 15),
+    role: 'Remote ' + category.toUpperCase() + ' Node',
+    lat: lat,
+    lng: lng,
+    color: colors[category] || '#ffffff',
+    count: 0,
+    signal: Math.floor(Math.random() * 4) + 1,
+    latency: Math.floor(Math.random() * 500) + 10,
+    lastPayload: 'New Connection'
+  };
+
+
+  updateMapSource();
+  drawNetworkLines();
+  renderTopologyList();
+  console.log(`🌍 New Dynamic Node Registered: ${id} at [${lat.toFixed(2)}, ${lng.toFixed(2)}]`);
+  return mqttNodes[id];
+}
+
+function renderTopologyList() {
+  const listEl = document.getElementById('topology-list');
+  const countEl = document.getElementById('node-active-count');
+  if (!listEl) return;
+
+  const nodeKeys = Object.keys(mqttNodes);
+  countEl.innerText = `${nodeKeys.length} NODES`;
+
+  listEl.innerHTML = nodeKeys.map(key => {
+    const node = mqttNodes[key];
+    const signalBars = Array.from({ length: 4 }, (_, i) => 
+      `<div class="signal-bar ${i < node.signal ? 'active' : ''}" style="height: ${(i + 1) * 2}px"></div>`
+    ).join('');
+
+    return `
+      <div class="node-item" onclick="focusNode('${key}')">
+        <div class="node-indicator" style="background: ${node.color}; color: ${node.color}"></div>
+        <div class="node-info">
+          <div class="node-name">${node.name}</div>
+          <div class="node-role">${node.role}</div>
+          <div class="node-details">
+            <div class="signal-bars">${signalBars}</div>
+            <div class="node-latency">${node.latency}ms</div>
+          </div>
+          <div class="payload-peek" id="peek-${key}">${node.lastPayload}</div>
+        </div>
+        <div class="node-count-badge" id="list-count-${key}">${formatNumber(node.count)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+
+function focusNode(key) {
+  const node = mqttNodes[key];
+  if (!node) return;
+  map.flyTo({ center: [node.lng, node.lat], zoom: 6, pitch: 45, duration: 2000 });
+}
+
+
+function updateMapSource() {
+  const features = [];
+  Object.keys(mqttNodes).forEach(key => {
+    const node = mqttNodes[key];
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [node.lng, node.lat] },
+      properties: {
+        id: key,
+        name: node.name,
+        role: node.role,
+        color: node.color,
+        isBroker: key === 'broker'
+      }
+    });
+  });
+
+  const source = map.getSource('mqtt-nodes-source');
+  if (source) {
+    source.setData({ type: 'FeatureCollection', features: features });
+  }
+}
+
+function generateBezierCurve(start, end) {
+  const points = [];
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  
+  // Calculate a control point to create an arc
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const midX = start[0] + dx/2;
+  const midY = start[1] + dy/2;
+  
+  // Curve perpendicular to the line, bend ratio 0.3
+  const bend = 0.3; 
+  const ctrlX = midX - (dy/dist) * dist * bend;
+  const ctrlY = midY + (dx/dist) * dist * bend;
+
+  for (let i = 0; i <= 50; i++) {
+    const t = i / 50;
+    const x = (1-t)*(1-t)*start[0] + 2*(1-t)*t*ctrlX + t*t*end[0];
+    const y = (1-t)*(1-t)*start[1] + 2*(1-t)*t*ctrlY + t*t*end[1];
+    points.push([x, y]);
+  }
+  return points;
+}
+
+function drawNetworkLines() {
+  const lineFeatures = [];
+  Object.keys(mqttNodes).forEach(key => {
+    if (key !== 'broker') {
+      const curveCoords = generateBezierCurve(
+        [mqttNodes[key].lng, mqttNodes[key].lat], 
+        [mqttNodes['broker'].lng, mqttNodes['broker'].lat]
+      );
+      
+      lineFeatures.push({
+        'type': 'Feature',
+        'geometry': {
+          'type': 'LineString',
+          'coordinates': curveCoords
+        },
+        'properties': {
+          'id': key,
+          'color': mqttNodes[key].color
+        }
+      });
+    }
+  });
+
+  if (!map.getSource('mqtt-lines')) {
+    map.addSource('mqtt-lines', {
+      'type': 'geojson',
+      'data': {
+        'type': 'FeatureCollection',
+        'features': lineFeatures
+      }
+    });
+
+    map.addLayer({
+      'id': 'mqtt-lines-layer',
+      'type': 'line',
+      'source': 'mqtt-lines',
+      'paint': {
+        'line-color': ['get', 'color'],
+        'line-width': 1.5,
+        'line-opacity': 0.3,
+        'line-dasharray': [2, 2]
+      }
+    });
+  } else {
+    map.getSource('mqtt-lines').setData({
+      'type': 'FeatureCollection',
+      'features': lineFeatures
+    });
+  }
+}
+
+let activeLasers = 0;
+
+function shootLaser(startCoord, endCoord, color) {
+  if (!map.isStyleLoaded() || activeLasers > 15) return;
+  activeLasers++;
+  
+  const laserId = 'laser-' + Math.random().toString(36).substr(2, 9);
+  const path = generateBezierCurve(startCoord, endCoord);
+  
+  map.addSource(laserId, {
+    'type': 'geojson',
+    'data': { 'type': 'Point', 'coordinates': path[0] }
+  });
+
+  map.addLayer({
+    'id': laserId,
+    'type': 'circle',
+    'source': laserId,
+    'paint': {
+      'circle-radius': 4,
+      'circle-color': color,
+      'circle-blur': 0.2,
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#fff'
+    }
+  });
+
+  let startTime;
+  const duration = 1000; // 1000ms travel time
+
+  function animate(timestamp) {
+    if (!startTime) startTime = timestamp;
+    const progress = (timestamp - startTime) / duration;
+
+    if (progress <= 1) {
+      const idx = Math.floor(progress * (path.length - 1));
+      
+      const source = map.getSource(laserId);
+      if (source && path[idx]) {
+        source.setData({ 'type': 'Point', 'coordinates': path[idx] });
+      }
+      requestAnimationFrame(animate);
+    } else {
+      activeLasers--;
+      if (map.getLayer(laserId)) map.removeLayer(laserId);
+      if (map.getSource(laserId)) map.removeSource(laserId);
+    }
+  }
+  requestAnimationFrame(animate);
+}
+
+map.on('style.load', () => {
+  setupMapFeatures(document.documentElement.getAttribute('data-theme') || 'dark');
+  initMqttTopology();
+  drawNetworkLines();
+  renderTopologyList();
+  spinGlobe(); // Start rotating immediately upon load
+});
+
 
 // ── MQTT Connection ─────────────────────────────────────────────────────────
 const client = mqtt.connect('ws://localhost:9001', {
@@ -76,6 +572,10 @@ client.on('message', (topic, payload, packet) => {
   try { data = JSON.parse(payload.toString()); } catch { data = payload.toString(); }
 
   const qos = packet.qos;
+  if (qos === 2) {
+    console.log(`🔔 QoS 2 Notification: [${topic}]`);
+    playBlip('qos2');
+  }
   const isRetained = packet.retain;
   const userProps = data._props?.userProperties || {};
   const expiry = data._props?.messageExpiryInterval;
@@ -122,6 +622,69 @@ client.on('message', (topic, payload, packet) => {
       topic.includes('emergency/alert/new') ||
       data.sharedGroup || data.sharedTopic) {
     state.features.shared = true;
+  }
+
+  // Update MQTT Topology Nodes
+  mqttNodes['broker'].count++;
+  const brokerStat = document.getElementById('node-stat-broker');
+  if (brokerStat) brokerStat.innerText = `Processed: ${mqttNodes['broker'].count}`;
+
+  // Identify source node
+  let publisherId = data.publisher || data.unit_id || data.intersection_id || userProps.source;
+  let targetKey = (pubType && mqttNodes[pubType]) ? pubType : publisherId;
+
+  if (targetKey) {
+    if (!mqttNodes[targetKey]) {
+      registerDynamicNode(targetKey, category);
+    }
+
+    const node = mqttNodes[targetKey];
+    node.count++;
+    
+    // Update payload peek and latency
+    node.lastPayload = typeof data === 'object' ? JSON.stringify(data).substring(0, 30) + '...' : data.substring(0, 30);
+    node.latency = Math.floor(Math.random() * 50) + 10; // Variative latency update
+    
+    const nodeStatEl = document.getElementById(`node-stat-${targetKey}`);
+    if (nodeStatEl) nodeStatEl.innerText = `Active: ${node.count}`;
+
+    const listCountEl = document.getElementById(`list-count-${targetKey}`);
+    if (listCountEl) listCountEl.innerText = formatNumber(node.count);
+
+    const peekEl = document.getElementById(`peek-${targetKey}`);
+    if (peekEl) peekEl.innerText = node.lastPayload;
+
+    // 1. Pew Pew Laser from Publisher to Broker
+    shootLaser(
+      [node.lng, node.lat],
+      [mqttNodes['broker'].lng, mqttNodes['broker'].lat],
+      node.color
+    );
+
+    // 2. Wait 800ms for it to reach Broker, then shoot to Subscribers
+    setTimeout(() => {
+      // Command Center receives all
+      mqttNodes['command-center'].count++;
+      const ccStat = document.getElementById('node-stat-command-center');
+      if (ccStat) ccStat.innerText = `Received: ${mqttNodes['command-center'].count}`;
+      shootLaser(
+        [mqttNodes['broker'].lng, mqttNodes['broker'].lat],
+        [mqttNodes['command-center'].lng, mqttNodes['command-center'].lat],
+        '#fbbf24'
+      );
+      
+      // Public Alert receives emergency
+      if (category === 'emergency') {
+        mqttNodes['public-alert'].count++;
+        const paStat = document.getElementById('node-stat-public-alert');
+        if (paStat) paStat.innerText = `Processed: ${mqttNodes['public-alert'].count}`;
+        shootLaser(
+          [mqttNodes['broker'].lng, mqttNodes['broker'].lat],
+          [mqttNodes['public-alert'].lng, mqttNodes['public-alert'].lat],
+          '#ea580c'
+        );
+      }
+    }, 800);
   }
 
   // Add to feed
@@ -217,23 +780,79 @@ function updateFeatures() {
   }
 }
 
+// ── JSON Inspector & Search ────────────────────────────────────────────────
+let feedSearchQuery = '';
+
+function filterFeed() {
+  const input = document.getElementById('feed-search');
+  feedSearchQuery = input.value.toLowerCase();
+  
+  const clearBtn = document.getElementById('clear-search-btn');
+  if (clearBtn) {
+    if (feedSearchQuery) clearBtn.classList.remove('hidden');
+    else clearBtn.classList.add('hidden');
+  }
+  
+  rerenderFeed();
+}
+
+function clearSearch() {
+  const input = document.getElementById('feed-search');
+  if (input) input.value = '';
+  feedSearchQuery = '';
+  const clearBtn = document.getElementById('clear-search-btn');
+  if (clearBtn) clearBtn.classList.add('hidden');
+  rerenderFeed();
+}
+
+function closeInspector() {
+  document.getElementById('json-inspector').classList.add('hidden');
+}
+
+function openInspector(data) {
+  playBlip('popup');
+  const overlay = document.getElementById('json-inspector');
+  const code = document.getElementById('json-code');
+  
+  const str = JSON.stringify(data, null, 2) || '';
+  const highlighted = str.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+        let cls = 'json-number';
+        if (/^"/.test(match)) {
+            if (/:$/.test(match)) { cls = 'json-key'; } else { cls = 'json-string'; }
+        } else if (/true|false/.test(match)) { cls = 'json-boolean';
+        } else if (/null/.test(match)) { cls = 'json-null'; }
+        return '<span class="' + cls + '">' + match + '</span>';
+  });
+  
+  code.innerHTML = highlighted;
+  overlay.classList.remove('hidden');
+}
+
 // ── Message Feed ────────────────────────────────────────────────────────────
 function addToFeed(msg) {
   state.feedMessages.unshift(msg);
   if (state.feedMessages.length > MAX_FEED) state.feedMessages.pop();
-  renderFeedItem(msg);
-}
+  
+  if (feedSearchQuery) {
+    const payloadStr = JSON.stringify(msg.data).toLowerCase();
+    const topicStr = msg.topic.toLowerCase();
+    if (!payloadStr.includes(feedSearchQuery) && !topicStr.includes(feedSearchQuery)) return;
+  }
+  if (state.filter !== 'all' && msg.category !== state.filter) return;
 
-function renderFeedItem(msg) {
   const feed = document.getElementById('message-feed');
   const empty = feed.querySelector('.feed-empty');
   if (empty) empty.remove();
+  
+  feed.prepend(createFeedCard(msg));
+  while (feed.children.length > MAX_FEED) feed.removeChild(feed.lastChild);
+}
 
-  if (state.filter !== 'all' && msg.category !== state.filter) return;
-
+function createFeedCard(msg) {
   const card = document.createElement('div');
   card.className = `msg-card ${msg.category}`;
-  card.onclick = () => card.classList.toggle('expanded');
+  card.style.cursor = 'pointer';
+  card.onclick = () => openInspector(msg.data);
 
   const icon = ICONS[msg.category] || ICONS.system;
   const time = new Date(msg.timestamp).toLocaleTimeString();
@@ -268,13 +887,7 @@ function renderFeedItem(msg) {
     <div class="msg-body">${body}</div>
     ${propsHtml ? `<div class="msg-props">${propsHtml}</div>` : ''}
   `;
-
-  feed.insertBefore(card, feed.firstChild);
-
-  // Limit DOM nodes
-  while (feed.children.length > MAX_FEED) {
-    feed.removeChild(feed.lastChild);
-  }
+  return card;
 }
 
 // ── Filters ─────────────────────────────────────────────────────────────────
@@ -289,19 +902,30 @@ function setFilter(filter) {
 function rerenderFeed() {
   const feed = document.getElementById('message-feed');
   feed.innerHTML = '';
-  const filtered = state.feedMessages.filter(m => state.filter === 'all' || m.category === state.filter);
-  filtered.forEach(msg => {
-    renderFeedItem(msg);
+  const filtered = state.feedMessages.filter(m => {
+    if (state.filter !== 'all' && m.category !== state.filter) return false;
+    if (feedSearchQuery) {
+      const payloadStr = JSON.stringify(m.data).toLowerCase();
+      const topicStr = m.topic.toLowerCase();
+      if (!payloadStr.includes(feedSearchQuery) && !topicStr.includes(feedSearchQuery)) return false;
+    }
+    return true;
   });
+  
+  filtered.forEach(msg => {
+    feed.appendChild(createFeedCard(msg));
+  });
+  
   if (filtered.length === 0) {
+    const searchHint = feedSearchQuery ? ` matching "${feedSearchQuery}"` : '';
     feed.innerHTML = `<div class="feed-empty"><div class="empty-state-v2">
       <div class="radar-container">
         <svg class="icon-lg"><use href="#icon-radio"></use></svg>
         <div class="radar-ping"></div>
         <div class="radar-ping" style="animation-delay: 0.7s;"></div>
       </div>
-      <div class="empty-title">NO DATA</div>
-      <div class="empty-desc">No messages match the current filter</div>
+      <div class="empty-title">NO DATA STREAM</div>
+      <div class="empty-desc">Belum ada pesan yang masuk${searchHint}. Menunggu sinyal...</div>
     </div></div>`;
   }
 }
@@ -412,11 +1036,151 @@ function formatNumber(n) {
   return n.toString();
 }
 
-// ── Clock ───────────────────────────────────────────────────────────────────
+// ── Sparklines ──────────────────────────────────────────────────────────────
+const sparkData = { messages: [], throughput: [] };
+function drawSparkline(canvasId, dataArr, color) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (dataArr.length === 0) return;
+
+  const maxVal = Math.max(...dataArr, 10); 
+  const stepX = canvas.width / (Math.max(dataArr.length - 1, 1));
+  const scaleY = canvas.height / maxVal;
+
+  ctx.beginPath();
+  ctx.moveTo(0, canvas.height - dataArr[0] * scaleY);
+  for (let i = 1; i < dataArr.length; i++) {
+    ctx.lineTo(i * stepX, canvas.height - dataArr[i] * scaleY);
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+// ── Clock & Heartbeat ───────────────────────────────────────────────────────
 setInterval(() => {
   document.getElementById('header-time').textContent = new Date().toLocaleTimeString();
   updateStats();
+  
+  sparkData.messages.push(state.messages);
+  if (sparkData.messages.length > 30) sparkData.messages.shift();
+  drawSparkline('sparkline-messages', sparkData.messages, 'rgba(255,255,255,0.8)');
+
+  sparkData.throughput.push(state.throughputWindow.length);
+  if (sparkData.throughput.length > 30) sparkData.throughput.shift();
+  drawSparkline('sparkline-throughput', sparkData.throughput, '#38bdf8');
 }, 1000);
+
+// ── Controls & Actions ──────────────────────────────────────────────────────
+function resetMap() {
+  if (activePopup) {
+    activePopup.remove();
+    activePopup = null;
+    activePopupNodeId = null;
+  }
+  map.flyTo({ center: [0, 20], zoom: 1.5, pitch: 0, bearing: 0, essential: true });
+}
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  const newTheme = isDark ? 'light' : 'dark';
+  
+  html.setAttribute('data-theme', newTheme);
+  
+  document.getElementById('theme-icon').innerHTML = newTheme === 'light' ? '<use href="#icon-moon"></use>' : '<use href="#icon-sun"></use>';
+  
+  // Re-apply fog without changing base style
+  setupMapFeatures(newTheme);
+}
+
+function scrollToFeed(query) {
+  if (query) {
+    const searchInput = document.getElementById('feed-search');
+    if (searchInput) {
+      searchInput.value = query;
+      feedSearchQuery = query.toLowerCase();
+      state.filter = 'all'; 
+      
+      // Update UI buttons for filter
+      document.querySelectorAll('.feed-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === 'all');
+      });
+      
+      rerenderFeed();
+
+      const clearBtn = document.getElementById('clear-search-btn');
+      if (clearBtn) clearBtn.classList.remove('hidden');
+    }
+  }
+  const element = document.getElementById('section-feed');
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth' });
+  }
+}
+
+function toggleControls() {
+  const popup = document.getElementById('controls-popup');
+  popup.classList.toggle('hidden');
+}
+
+// ── Panel Minimize / Restore System ─────────────────────────────────────────
+const panelRegistry = {
+  topology:   { icon: '#icon-layers',   label: 'Network Topology', dock: 'left' },
+  features:   { icon: '#icon-settings', label: 'Feature Matrix',   dock: 'right' },
+  qos:        { icon: '#icon-chart',    label: 'QoS Distribution', dock: 'right' },
+  publishers: { icon: '#icon-server',   label: 'Publisher Health',  dock: 'right' },
+  kpi:        { icon: '#icon-activity', label: 'KPI Strip',         dock: 'left' },
+};
+
+const hiddenPanels = new Set();
+
+function togglePanel(panelId) {
+  const el = document.querySelector(`[data-panel-id="${panelId}"]`);
+  if (!el) return;
+
+  if (hiddenPanels.has(panelId)) {
+    // Restore
+    el.classList.remove('panel-hidden');
+    hiddenPanels.delete(panelId);
+  } else {
+    // Minimize
+    el.classList.add('panel-hidden');
+    hiddenPanels.add(panelId);
+  }
+
+  renderDock();
+}
+
+function renderDock() {
+  const dockLeft = document.getElementById('floating-dock-left');
+  const dockRight = document.getElementById('floating-dock-right');
+  if (!dockLeft || !dockRight) return;
+
+  dockLeft.innerHTML = '';
+  dockRight.innerHTML = '';
+
+  hiddenPanels.forEach(panelId => {
+    const info = panelRegistry[panelId];
+    if (!info) return;
+
+    const btn = document.createElement('button');
+    btn.className = 'dock-btn';
+    btn.setAttribute('data-tooltip', info.label);
+    btn.title = info.label;
+    btn.innerHTML = `<svg class="icon-sm"><use href="${info.icon}"></use></svg>`;
+    btn.onclick = () => togglePanel(panelId);
+
+    if (info.dock === 'left') {
+      dockLeft.appendChild(btn);
+    } else {
+      dockRight.appendChild(btn);
+    }
+  });
+}
+
 
 // ── Topic Alias auto-detection ──────────────────────────────────────────────
 setTimeout(() => {
