@@ -12,7 +12,8 @@ const RequestResponseHandler = require('../shared/requestResponse');
 
 const CLIENT_ID = 'novapulse-command-center';
 
-const client = mqtt.connect('mqtt://localhost:1883', {
+const brokerUrl = process.env.MQTT_URL || 'mqtt://localhost:1883';
+const client = mqtt.connect(brokerUrl, {
   clientId: CLIENT_ID,
   protocolVersion: 4,
   clean: true,

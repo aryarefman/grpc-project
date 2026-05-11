@@ -106,15 +106,19 @@
         <span id="broker-status-text" class="ws-label">ESTABLISHING LINK...</span>
       </div>
       <div class="topnav-right">
+        <a href="http://localhost:3000" class="btn btn-ghost" style="height: 32px; padding: 0 12px; font-size: 0.7rem; border-color: var(--border); text-decoration: none; display: flex; align-items: center; gap: 6px;" title="Back to Main Dashboard">
+          <svg class="icon-sm" style="width: 14px; height: 14px;"><use href="#icon-activity"></use></svg>
+          <span>MAIN DASHBOARD</span>
+        </a>
         <button class="btn btn-ghost" style="height: 32px; padding: 0 12px; font-size: 0.7rem; border-color: var(--border);" onclick="toggleControls()">
           <svg class="icon-sm"><use href="#icon-bolt"></use></svg> CONTROL HUB
         </button>
-        <button class="btn btn-primary" style="height: 32px; padding: 0 12px; font-size: 0.7rem; border-color: var(--border);" onclick="scrollToFeed()">
+        <button class="btn btn-ghost" style="height: 32px; padding: 0 12px; font-size: 0.7rem; border-color: var(--border);" onclick="scrollToFeed()">
           <svg class="icon-sm"><use href="#icon-log"></use></svg> LIVE FEED
         </button>
         <button id="toggle-all-btn" class="btn btn-ghost" style="height: 32px; padding: 0 12px; font-size: 0.7rem; border-color: var(--border); min-width: 110px;" onclick="toggleAllPanels()">
-          <svg class="icon-sm"><use id="toggle-all-icon" href="#icon-close"></use></svg> 
-          <span id="toggle-all-text">CLOSE ALL</span>
+          <svg class="icon-sm"><use id="toggle-all-icon" href="#icon-layers"></use></svg> 
+          <span id="toggle-all-text">OPEN ALL</span>
         </button>
         <button class="btn btn-ghost" style="height: 32px; padding: 0 12px; font-size: 0.7rem; border-color: var(--border);" onclick="resetMap()">
           <svg class="icon-sm"><use href="#icon-refresh"></use></svg> RESET GLOBE

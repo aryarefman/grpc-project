@@ -145,33 +145,32 @@ cd "project rgpc"
 npm install
 ```
 
-### 2. Jalankan Server
-```bash
-npm run server
-```
-Server akan berjalan di `localhost:50051`
+### 🚦 Cara Menjalankan (Pilih Salah Satu)
 
-### 3. Jalankan Client (di terminal terpisah)
-
-**Traffic Client:**
+#### A. Cara "Sekali Jalan" (Direkomendasikan)
+Gunakan perintah ini untuk menyalakan gRPC Server, MQTT Broker, Dashboard, dan semua Agent secara otomatis dalam satu terminal (tanpa log yang mengganggu):
 ```bash
-npm run client:traffic
+npm run start:all
 ```
 
-**Environment Client:**
+#### B. Menggunakan Docker 🐳
+Jika Anda memiliki Docker Desktop, Anda bisa menjalankan seluruh ekosistem NovaPulse (termasuk MQTT) dengan:
 ```bash
-npm run client:environment
+docker-compose up --build
 ```
 
-**Emergency Client:**
-```bash
-npm run client:emergency
-```
+#### C. Cara Manual (Multi-Terminal)
+1. **Jalankan Server:** `npm run server`
+2. **Jalankan MQTT Broker:** `npm run mqtt:broker`
+3. **Jalankan Clients:** (Buka terminal baru untuk masing-masing)
+   - `npm run client:traffic`
+   - `npm run client:environment`
+   - `npm run client:emergency`
+   - `npm run client:dashboard`
 
-**Unified Dashboard:**
-```bash
-npm run client:dashboard
-```
+### 🌐 Akses Dashboard
+- **Main Dashboard (gRPC + Web):** [http://localhost:3000](http://localhost:3000)
+- **MQTT Protocol Monitor:** [http://localhost:3001](http://localhost:3001)
 
 ## 🔧 Error Handling
 

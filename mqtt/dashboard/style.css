@@ -848,9 +848,16 @@ body::after {
   letter-spacing: 0.02em;
 }
 
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  filter: brightness(1.1);
+}
+
 .btn:active {
-  transform: translateY(1px);
-  box-shadow: none;
+  transform: scale(0.96);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.1s;
 }
 
 .btn-primary {
@@ -902,6 +909,11 @@ body::after {
   background: var(--bg-surface);
   color: var(--text-main);
   border-color: var(--border-bright);
+  transform: rotate(15deg) scale(1.1);
+}
+
+.btn-icon:active {
+  transform: scale(0.9);
 }
 
 .cmd-output {
@@ -979,7 +991,9 @@ body::after {
   flex-direction: column;
   gap: 6px;
   padding: 12px 16px;
-  background: var(--bg-surface);
+  background: var(--bg-thick-glass); /* Darker glass for better contrast */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   border-left: 3px solid var(--text-faint);
@@ -991,7 +1005,8 @@ body::after {
 .msg-card:hover {
   border-color: var(--border-bright);
   background: var(--bg-card);
-  transform: translateX(4px);
+  transform: translateX(6px);
+  box-shadow: var(--shadow-sm);
 }
 
 .msg-card.traffic {
@@ -1337,7 +1352,18 @@ body::after {
   position: relative;
   z-index: 10;
   padding: 40px 32px 80px;
-  background: linear-gradient(to bottom, transparent, var(--bg-base));
+  background: transparent; /* Changed to transparent so it blends with the map/background */
+}
+
+.bottom-feed-section .card-feed {
+  height: 600px; 
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-thick-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-bright);
+  box-shadow: var(--shadow-floating);
 }
 
 .container-narrow {
@@ -1646,7 +1672,7 @@ body::after {
 .feed-terminal-search {
   display: flex;
   align-items: center;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.6); /* Slightly darker for terminal feel */
   border: 1px solid var(--border-bright);
   border-radius: var(--radius-sm);
   padding: 6px 12px;

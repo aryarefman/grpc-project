@@ -31,20 +31,16 @@ mqtt/
 ```
 
 ## 🚀 Cara Menjalankan
-
-Buka terminal di folder `mqtt`, lalu jalankan secara berurutan:
+NovaPulse kini mendukung eksekusi terintegrasi:
 
 ```bash
-# 1. Jalankan Broker (Wajib)
-node broker/mqttBroker.js
+# Opsi 1: Satu Perintah (Lokal)
+npm run start:all
 
-# 2. Jalankan Dashboard (Buka browser ke index.html)
-
-# 3. Jalankan Publisher (Pilih salah satu atau semua)
-node publishers/trafficPublisher.js
-node publishers/environmentPublisher.js
-node publishers/emergencyPublisher.js
+# Opsi 2: Docker Orchestration
+docker-compose up --build
 ```
+Dua perintah di atas akan otomatis menyalakan Broker, Dashboard, dan seluruh Agent (Publisher/Subscriber) sekaligus.
 
 ## ✅ 10 Fitur MQTT yang Diimplementasikan
 

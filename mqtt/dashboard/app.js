@@ -534,7 +534,7 @@ map.on('style.load', () => {
 
 
 // ── MQTT Connection ─────────────────────────────────────────────────────────
-const client = mqtt.connect('ws://localhost:9001', {
+const client = mqtt.connect(`ws://${location.hostname}:9001`, {
   clientId: 'novapulse-dashboard-' + Math.random().toString(36).substring(7),
   clean: true,
   reconnectPeriod: 3000,

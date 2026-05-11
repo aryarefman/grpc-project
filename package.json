@@ -17,7 +17,8 @@
     "mqtt:sub:command-center": "node mqtt/subscribers/commandCenterSub.js",
     "mqtt:sub:public-alert": "node mqtt/subscribers/publicAlertSub.js",
     "mqtt:sub:public-alert-2": "node mqtt/subscribers/publicAlertSub.js 2",
-    "mqtt:dashboard": "node mqtt/dashboard/server.js"
+    "mqtt:dashboard": "node mqtt/dashboard/server.js",
+    "start:all": "node scripts/start-local.js"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.9.0",

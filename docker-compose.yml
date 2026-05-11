@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # 1. MQTT Broker (The Central nervous system)
+  mqtt-broker:
+    build: .
+    command: npm run mqtt:broker
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    networks:
+      - novapulse-net
+
+  # 2. gRPC Server + Web Dashboard (Port 3000)
+  grpc-server:
+    build: .
+    command: npm run server
+    ports:
+      - "3000:3000"
+      - "50051:50051"
+    networks:
+      - novapulse-net
+
+  # 3. MQTT Dashboard (Port 3001)
+  mqtt-dashboard:
+    build: .
+    command: npm run mqtt:dashboard
+    ports:
+      - "3001:3001"
+    networks:
+      - novapulse-net
+
+  # 4. MQTT Agents (Publishers & Subscribers)
+  mqtt-agents:
+    build: .
+    command: bash scripts/docker-run-agents.sh
+    environment:
+      - MQTT_URL=mqtt://mqtt-broker:1883
+    depends_on:
+      - mqtt-broker
+    networks:
+      - novapulse-net
+
+networks:
+  novapulse-net:
+    driver: bridge
