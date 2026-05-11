@@ -460,9 +460,9 @@ function drawNetworkLines() {
       'source': 'mqtt-lines',
       'paint': {
         'line-color': ['get', 'color'],
-        'line-width': 1.5,
-        'line-opacity': 0.3,
-        'line-dasharray': [2, 2]
+        'line-width': 1.8,
+        'line-opacity': 0.7,
+        'line-dasharray': [1, 1]
       }
     });
   } else {
@@ -1135,7 +1135,8 @@ const panelRegistry = {
   kpi:        { icon: '#icon-activity', label: 'KPI Strip',         dock: 'left' },
 };
 
-const hiddenPanels = new Set();
+const hiddenPanels = new Set(['topology', 'features', 'qos', 'publishers', 'kpi']);
+renderDock();
 
 function togglePanel(panelId) {
   const el = document.querySelector(`[data-panel-id="${panelId}"]`);
@@ -1152,7 +1153,59 @@ function togglePanel(panelId) {
   }
 
   renderDock();
+  updateToggleButton();
 }
+
+function toggleAllPanels() {
+  const allIds = Object.keys(panelRegistry);
+  const isAnyVisible = allIds.some(id => !hiddenPanels.has(id));
+
+  if (isAnyVisible) {
+    minimizeAll();
+  } else {
+    restoreAll();
+  }
+  updateToggleButton();
+}
+
+function minimizeAll() {
+  Object.keys(panelRegistry).forEach(id => {
+    const el = document.querySelector(`[data-panel-id="${id}"]`);
+    if (el) el.classList.add('panel-hidden');
+    hiddenPanels.add(id);
+  });
+  renderDock();
+  updateToggleButton();
+}
+
+function restoreAll() {
+  Object.keys(panelRegistry).forEach(id => {
+    const el = document.querySelector(`[data-panel-id="${id}"]`);
+    if (el) el.classList.remove('panel-hidden');
+    hiddenPanels.delete(id);
+  });
+  renderDock();
+  updateToggleButton();
+}
+
+function updateToggleButton() {
+  const allIds = Object.keys(panelRegistry);
+  const isAnyVisible = allIds.some(id => !hiddenPanels.has(id));
+  const btnText = document.getElementById('toggle-all-text');
+  const btnIcon = document.getElementById('toggle-all-icon');
+  
+  if (btnText && btnIcon) {
+    btnText.textContent = isAnyVisible ? 'CLOSE ALL' : 'OPEN ALL';
+    btnIcon.setAttribute('href', isAnyVisible ? '#icon-close' : '#icon-layers');
+  }
+}
+
+// Call update initially to sync with starting state
+setTimeout(updateToggleButton, 100);
+
+window.toggleAllPanels = toggleAllPanels;
+window.minimizeAll = minimizeAll;
+window.restoreAll = restoreAll;
 
 function renderDock() {
   const dockLeft = document.getElementById('floating-dock-left');

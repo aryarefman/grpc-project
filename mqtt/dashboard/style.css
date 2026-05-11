@@ -323,6 +323,17 @@ body::after {
   pointer-events: none;
   position: relative;
   z-index: 10;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1), max-height 0.4s ease, opacity 0.4s ease;
+  max-height: 500px;
+  overflow: hidden;
+}
+
+.kpi-close-btn {
+  position: absolute;
+  right: 32px;
+  top: 10px;
+  pointer-events: auto;
+  z-index: 20;
 }
 
 .kpi-strip::-webkit-scrollbar {
@@ -435,7 +446,7 @@ body::after {
 .dashboard-overlay {
   display: flex;
   justify-content: space-between;
-  padding: 0 32px 40px;
+  padding: 20px 32px 40px;
   max-width: 100%;
   gap: 24px;
   pointer-events: none;
@@ -443,6 +454,12 @@ body::after {
   /* Ensure it takes at least full height, but can grow */
   position: relative;
   z-index: 10;
+  transition: padding-top 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Adjust padding when KPI strip is hidden to avoid overlapping with sticky navbar */
+.kpi-strip.panel-hidden + .dashboard-overlay {
+  padding-top: 110px;
 }
 
 .sidebar-left,
@@ -508,9 +525,10 @@ body::after {
   flex-direction: column;
   gap: 20px;
   box-shadow: var(--shadow-md);
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1), max-height 0.4s ease, opacity 0.4s ease, transform 0.4s ease;
   position: relative;
   overflow: hidden;
+  max-height: 2000px;
 }
 
 .card:hover {
@@ -1515,7 +1533,16 @@ body::after {
 
 /* ── Panel Hidden State ───────────────────────────────────────────────────── */
 .panel-hidden {
-  display: none !important;
+  opacity: 0 !important;
+  transform: translateY(-20px) scale(0.95) !important;
+  max-height: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-width: 0 !important;
+  pointer-events: none !important;
+  overflow: hidden !important;
 }
 
 /* ── Floating Restore Dock ────────────────────────────────────────────────── */

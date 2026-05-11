@@ -587,7 +587,7 @@ canvas#traffic-chart { width: 100%; height: 220px; }
 .cmd-panel { display: flex; flex-direction: column; gap: 24px; padding-top: 8px; width: 100%; animation: panel-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes panel-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .cmd-section { display: flex; flex-direction: column; gap: 12px; width: 100%; }
-.cmd-section-title { font-size: 0.9rem; font-weight: 600; color: var(--text-main); padding-bottom: 6px; border-bottom: 1px dashed var(--border); }
+.cmd-section-title { font-size: 0.9rem; font-weight: 600; color: var(--text-main); padding-bottom: 6px; border-bottom: 1px dashed var(--border-bright); }
 .cmd-form-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; }
 .form-group { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 6px; }
 .form-group label { font-size: 0.6rem; font-weight: 600; color: var(--text-muted); letter-spacing: 0.02em; text-transform: uppercase; }
