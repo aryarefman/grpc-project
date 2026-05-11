@@ -1,9 +1,14 @@
 # 🧠 NovaPulse - Smart City gRPC Nervous System
 
 # Output
-## Web
+## Main Dashboard
 <img width="1428" height="717" alt="image" src="https://github.com/user-attachments/assets/3eda504b-69e0-4e3a-9465-28ab3503b6ad" />
 <img width="1430" height="893" alt="image" src="https://github.com/user-attachments/assets/2c2e8569-c937-4afd-b3b0-bfc74433f733" />
+
+## MQTT Dashboard
+<img width="959" height="569" alt="image" src="https://github.com/user-attachments/assets/80c2d18e-9721-4349-9fe0-5b37a02026dc" />
+<img width="959" height="599" alt="image" src="https://github.com/user-attachments/assets/6aaff87b-1efd-467b-afe3-1f86729e719e" />
+<img width="959" height="569" alt="image" src="https://github.com/user-attachments/assets/ce7f3b01-95c9-4ab7-9d1e-9635894a5776" />
 
 ## Server
 <img width="1482" height="1003" alt="image" src="https://github.com/user-attachments/assets/d6d040e8-1db5-4176-9208-f5010bd2d4dc" />
