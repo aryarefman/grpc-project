@@ -2121,3 +2121,223 @@
      Congestion: 0.53 | Vehicles: 96 | Times Square
 [SUB: COMMAND CENTER] STDOUT:      Props: source=novapulse-traffic-publisher | zone=MANHATTAN | priority=NORMAL | unit=vehicles | data-type=congestion
 
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-traffic-publisher → novapulse/traffic/MANHATTAN/congestion QoS0
+[SUB: COMMAND CENTER] STDOUT:   🚦  QoS0  TTL:60s novapulse/traffic/MANHATTAN/congestion
+     Congestion: 0.26 | Vehicles: 47 | Broadway × 5th Ave
+     Props: source=novapulse-traffic-publisher | zone=MANHATTAN | priority=NORMAL | unit=vehicles | data-type=congestion
+
+[PUB: EMERGENCY] STDOUT:   ✅ RESOLVED: ALRT-9E4C1CAD by Ambulance Alpha-2
+[SUB: COMMAND CENTER] STDOUT:   🚨  QoS1  novapulse/emergency/alert/resolved
+     Alert: ALRT-9E4C1CAD | undefined undefined at undefined
+     Props: source=novapulse-emergency-publisher | event=resolved
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-emergency-publisher → novapulse/emergency/alert/resolved QoS1
+[SUB: PUBLIC ALERTS] STDOUT:   ✅ ALERT RESOLVED: ALRT-9E4C1CAD
+[SUB: PUBLIC ALERTS] STDOUT:      Resolved by: Ambulance Alpha-2 | Situation resolved
+[SUB: PUBLIC ALERTS] STDOUT: 
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-environment-publisher → novapulse/environment/EAST/temperature/reading QoS0
+[SUB: COMMAND CENTER] STDOUT:   🌿  QoS0  TTL:300s novapulse/environment/EAST/temperature/reading
+     Temp-Sensor Asakusa: 31.8°C [GOOD]
+     Props: source=novapulse-environment-publisher | sensor-id=SNS-007 | sensor-type=temperature | zone=EAST | unit=°C | quality=GOOD
+
+[SUB: COMMAND CENTER] STDOUT:   ⟶  Request: GET_STATUS
+[CORE: MQTT BROKER] STDOUT:   ⬇ SUBSCRIBE: novapulse-command-center → novapulse/system/command/response/e303fb29 QoS1
+[SUB: COMMAND CENTER] STDOUT:   📡  QoS1  novapulse/system/command/request
+     Props: request-id=e303fb29 | source=command-center
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-command-center → novapulse/system/command/request QoS1
+[SUB: COMMAND CENTER] STDOUT:   ⟵  Response: status=undefined, uptime=NaNs
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-traffic-publisher → novapulse/system/command/response/e303fb29 QoS1
+  ⬆ PUBLISH: novapulse-emergency-publisher → novapulse/system/command/response/e303fb29 QoS1
+  ⬆ PUBLISH: novapulse-environment-publisher → novapulse/system/command/response/e303fb29 QoS1
+[PUB: TRAFFIC] STDOUT:   📋 Summary published (retained) | Vehicles: 391 | Avg congestion: 0.36
+[PUB: ENVIRONMENT] STDOUT:   🟡 ALERT [WARNING]: Noise-Sensor Ueno = 77.1dB
+[SUB: COMMAND CENTER] STDOUT:   🚦  QoS1  TTL:600s novapulse/traffic/summary
+     Props: source=novapulse-traffic-publisher | data-type=summary | retained=true
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-traffic-publisher → novapulse/traffic/summary QoS1 [RETAIN]
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-environment-publisher → novapulse/environment/NORTH/alert QoS2
+[SUB: COMMAND CENTER] STDOUT:   🌿  QoS2  TTL:3600s novapulse/environment/NORTH/alert
+[SUB: PUBLIC ALERTS] STDOUT:   ┌─────────────────────────────────────────────────────
+  │ 🔔 ALERT: WARNING QoS2
+  │ Topic: novapulse/environment/NORTH/alert
+  │ ID: EALRT-F5EEAEA3 | Type: noise
+[SUB: COMMAND CENTER] STDOUT:      undefined: 77.1dB [undefined]
+     Props: source=novapulse-environment-publisher | severity=WARNING | sensor-type=noise | zone=NORTH | alert-type=threshold-exceeded
+[SUB: PUBLIC ALERTS] STDOUT:   │ Location: NORTH
+  │ WARNING: Noise-Sensor Ueno value 77.1dB exceeded threshold
+  │ Props: source=novapulse-environment-publisher, severity=WARNING, sensor-type=noise, zone=NORTH, alert-type=threshold-exceeded
+  └─────────────────────────────────────────────────────
+
+[SUB: COMMAND CENTER] STDOUT: 
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-traffic-publisher → novapulse/traffic/MANHATTAN/congestion QoS0
+[SUB: COMMAND CENTER] STDOUT:   🚦  QoS0  TTL:60s novapulse/traffic/MANHATTAN/congestion
+     Congestion: 0.52 | Vehicles: 94 | Times Square
+[SUB: COMMAND CENTER] STDOUT:      Props: source=novapulse-traffic-publisher | zone=MANHATTAN | priority=NORMAL | unit=vehicles | data-type=congestion
+
+[PUB: EMERGENCY] STDOUT:   🚨 NEW ALERT [CRITICAL]: TRAFFIC_ACCIDENT at Centro (SOUTH)
+[SUB: COMMAND CENTER] STDOUT:   🌿  QoS1  TTL:600s novapulse/environment/summary
+[SUB: COMMAND CENTER] STDOUT:      Props: source=novapulse-environment-publisher | data-type=summary | retained=true
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-environment-publisher → novapulse/environment/summary QoS1 [RETAIN]
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-emergency-publisher → novapulse/emergency/alert/new QoS2
+[SUB: COMMAND CENTER] STDOUT:   🚨  QoS2  TTL:7200s novapulse/emergency/alert/new
+[SUB: COMMAND CENTER] STDOUT:      Alert: ALRT-E1209A54 | CRITICAL TRAFFIC_ACCIDENT at Centro
+     Props: source=novapulse-emergency-publisher | severity=CRITICAL | alert-type=TRAFFIC_ACCIDENT | zone=SOUTH | priority=URGENT
+
+  ╔══════════════════════════════════════════════════════╗
+  ║   📊 Command Center Statistics                    ║
+  ╠══════════════════════════════════════════════════════╣
+  ║   Total Messages:  500                            ║
+  ║   QoS 0: 272 | QoS 1: 192 | QoS 2: 36             ║
+  ║   Retained: 1 | LWT Events: 0                     ║
+  ║   Alerts: 36                                      ║
+  ║   system:12 | lwt:3 | traffic:141 | environment:89 | heartbeat:114 | emergency:108║
+  ╚══════════════════════════════════════════════════════╝
+
+[PUB: TRAFFIC] STDOUT:   🚦 Light: Times Square YELLOW → GREEN
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-traffic-publisher → novapulse/traffic/MANHATTAN/light-change QoS1
+[SUB: COMMAND CENTER] STDOUT:   🚦  QoS1  TTL:120s novapulse/traffic/MANHATTAN/light-change
+[SUB: COMMAND CENTER] STDOUT:      Congestion: undefined | Vehicles: undefined | Times Square
+     Props: source=novapulse-traffic-publisher | zone=MANHATTAN | event-type=light-change | intersection=INT-002
+
+[PUB: EMERGENCY] STDOUT:   🚑 DISPATCHED: Ambulance Alpha-1 → Centro
+[SUB: COMMAND CENTER] STDOUT:   🚨  QoS1  novapulse/emergency/alert/update
+[SUB: COMMAND CENTER] STDOUT:      Alert: ALRT-E1209A54 | undefined undefined at undefined
+     Props: source=novapulse-emergency-publisher | event=dispatch
+
+[SUB: PUBLIC ALERTS] STDOUT:   🔄 ALERT UPDATE: ALRT-E1209A54 → DISPATCHED
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-emergency-publisher → novapulse/emergency/alert/update QoS1
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-emergency-publisher → novapulse/emergency/dispatch/request QoS2
+[SUB: COMMAND CENTER] STDOUT:   🚨  QoS2  TTL:3600s novapulse/emergency/dispatch/request
+     Alert: ALRT-E1209A54 | undefined undefined at Centro
+     Props: source=novapulse-emergency-publisher | dispatch-type=auto | zone=SOUTH
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-emergency-publisher → novapulse/emergency/dispatch/response QoS2
+[SUB: COMMAND CENTER] STDOUT: 
+[SUB: COMMAND CENTER] STDOUT:   🚨  QoS2  novapulse/emergency/dispatch/response
+[SUB: COMMAND CENTER] STDOUT:      Alert: ALRT-E1209A54 | undefined undefined at Centro
+     Props: source=novapulse-emergency-publisher | response-type=confirmation
+
+[PUB: ENVIRONMENT] STDOUT:   📡 Temp-Sensor Asakusa: 33.2°C [GOOD]
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-environment-publisher → novapulse/environment/EAST/temperature/reading QoS0
+[SUB: COMMAND CENTER] STDOUT:   🌿  QoS0  TTL:300s novapulse/environment/EAST/temperature/reading
+     Temp-Sensor Asakusa: 33.2°C [GOOD]
+[SUB: COMMAND CENTER] STDOUT:      Props: source=novapulse-environment-publisher | sensor-id=SNS-007 | sensor-type=temperature | zone=EAST | unit=°C | quality=GOOD
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-traffic-publisher → novapulse/traffic/BRONX/congestion QoS0
+[SUB: COMMAND CENTER] STDOUT:   🚦  QoS0  TTL:60s novapulse/traffic/BRONX/congestion
+     Congestion: 0.64 | Vehicles: 116 | Grand Concourse × Fordham Rd
+     Props: source=novapulse-traffic-publisher | zone=BRONX | priority=NORMAL | unit=vehicles | data-type=congestion
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-traffic-publisher → novapulse/traffic/BROOKLYN/congestion QoS0
+[SUB: COMMAND CENTER] STDOUT:   🚦  QoS0  TTL:60s novapulse/traffic/BROOKLYN/congestion
+     Congestion: 0 | Vehicles: 0 | Flatbush Ave × Atlantic Ave
+     Props: source=novapulse-traffic-publisher | zone=BROOKLYN | priority=NORMAL | unit=vehicles | data-type=congestion
+
+[SUB: COMMAND CENTER] STDOUT:   🚨  QoS1  TTL:600s novapulse/emergency/unit/UNIT-AMB01/status
+     Props: source=novapulse-emergency-publisher | unit-type=AMBULANCE | status=DISPATCHED
+
+  🚨  QoS1  TTL:600s novapulse/emergency/unit/UNIT-AMB02/status
+     Props: source=novapulse-emergency-publisher | unit-type=AMBULANCE | status=AVAILABLE
+
+  🚨  QoS1  TTL:600s novapulse/emergency/unit/UNIT-FIR01/status
+     Props: source=novapulse-emergency-publisher | unit-type=FIRE_TRUCK | status=AVAILABLE
+
+[SUB: COMMAND CENTER] STDOUT:   🚨  QoS1  TTL:600s novapulse/emergency/unit/UNIT-FIR02/status
+     Props: source=novapulse-emergency-publisher | unit-type=FIRE_TRUCK | status=AVAILABLE
+
+  🚨  QoS1  TTL:600s novapulse/emergency/unit/UNIT-POL01/status
+     Props: source=novapulse-emergency-publisher | unit-type=POLICE | status=AVAILABLE
+
+  🚨  QoS1  TTL:600s novapulse/emergency/unit/UNIT-POL02/status
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-emergency-publisher → novapulse/emergency/unit/UNIT-AMB01/status QoS1 [RETAIN]
+  ⬆ PUBLISH: novapulse-emergency-publisher → novapulse/emergency/unit/UNIT-AMB02/status QoS1 [RETAIN]
+  ⬆ PUBLISH: novapulse-emergency-publisher → novapulse/emergency/unit/UNIT-FIR01/status QoS1 [RETAIN]
+  ⬆ PUBLISH: novapulse-emergency-publisher → novapulse/emergency/unit/UNIT-FIR02/status QoS1 [RETAIN]
+  ⬆ PUBLISH: novapulse-emergency-publisher → novapulse/emergency/unit/UNIT-POL01/status QoS1 [RETAIN]
+  ⬆ PUBLISH: novapulse-emergency-publisher → novapulse/emergency/unit/UNIT-POL02/status QoS1 [RETAIN]
+[SUB: COMMAND CENTER] STDOUT:      Props: source=novapulse-emergency-publisher | unit-type=POLICE | status=AVAILABLE
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-environment-publisher → novapulse/environment/NORTH/air_quality/reading QoS0
+[SUB: COMMAND CENTER] STDOUT:   🌿  QoS0  TTL:300s novapulse/environment/NORTH/air_quality/reading
+[SUB: COMMAND CENTER] STDOUT:      AQ-Sensor Akihabara: 84.2AQI [GOOD]
+     Props: source=novapulse-environment-publisher | sensor-id=SNS-006 | sensor-type=air_quality | zone=NORTH | unit=AQI | quality=GOOD
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-traffic-publisher → novapulse/traffic/MANHATTAN/congestion QoS0
+[SUB: COMMAND CENTER] STDOUT:   🚦  QoS0  TTL:60s novapulse/traffic/MANHATTAN/congestion
+     Congestion: 0.54 | Vehicles: 97 | Times Square
+     Props: source=novapulse-traffic-publisher | zone=MANHATTAN | priority=NORMAL | unit=vehicles | data-type=congestion
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-environment-publisher → novapulse/environment/CENTRAL/air_quality/reading QoS0
+[SUB: COMMAND CENTER] STDOUT:   🌿  QoS0  TTL:300s novapulse/environment/CENTRAL/air_quality/reading
+     AQ-Sensor Shinjuku: 67.8AQI [GOOD]
+     Props: source=novapulse-environment-publisher | sensor-id=SNS-001 | sensor-type=air_quality | zone=CENTRAL | unit=AQI | quality=GOOD
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-traffic-publisher → novapulse/traffic/BRONX/congestion QoS0
+[SUB: COMMAND CENTER] STDOUT:   🚦  QoS0  TTL:60s novapulse/traffic/BRONX/congestion
+[SUB: COMMAND CENTER] STDOUT:      Congestion: 0.62 | Vehicles: 111 | Grand Concourse × Fordham Rd
+     Props: source=novapulse-traffic-publisher | zone=BRONX | priority=NORMAL | unit=vehicles | data-type=congestion
+
+[PUB: TRAFFIC] STDOUT:   🚦 Light: Canal St × Bowery YELLOW → GREEN
+[SUB: COMMAND CENTER] STDOUT:   🚦  QoS1  TTL:120s novapulse/traffic/MANHATTAN/light-change
+     Congestion: undefined | Vehicles: undefined | Canal St × Bowery
+     Props: source=novapulse-traffic-publisher | zone=MANHATTAN | event-type=light-change | intersection=INT-006
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-traffic-publisher → novapulse/traffic/MANHATTAN/light-change QoS1
+[SUB: COMMAND CENTER] STDOUT: 
+[PUB: TRAFFIC] STDOUT:   📋 Summary published (retained) | Vehicles: 378 | Avg congestion: 0.35
+[PUB: ENVIRONMENT] STDOUT:   🟡 ALERT [WARNING]: Noise-Sensor Ueno = 77.1dB
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-traffic-publisher → novapulse/traffic/summary QoS1 [RETAIN]
+[SUB: COMMAND CENTER] STDOUT:   🚦  QoS1  TTL:600s novapulse/traffic/summary
+     Props: source=novapulse-traffic-publisher | data-type=summary | retained=true
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-environment-publisher → novapulse/environment/NORTH/alert QoS2
+[SUB: COMMAND CENTER] STDOUT:   🌿  QoS2  TTL:3600s novapulse/environment/NORTH/alert
+     undefined: 77.1dB [undefined]
+[SUB: COMMAND CENTER] STDOUT:      Props: source=novapulse-environment-publisher | severity=WARNING | sensor-type=noise | zone=NORTH | alert-type=threshold-exceeded
+
+[SUB: PUBLIC ALERTS] STDOUT:   ┌─────────────────────────────────────────────────────
+  │ 🔔 ALERT: WARNING QoS2
+  │ Topic: novapulse/environment/NORTH/alert
+  │ ID: EALRT-A03E814F | Type: noise
+  │ Location: NORTH
+[SUB: PUBLIC ALERTS] STDOUT:   │ WARNING: Noise-Sensor Ueno value 77.1dB exceeded threshold
+  │ Props: source=novapulse-environment-publisher, severity=WARNING, sensor-type=noise, zone=NORTH, alert-type=threshold-exceeded
+  └─────────────────────────────────────────────────────
+[SUB: PUBLIC ALERTS] STDOUT: 
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-traffic-publisher → novapulse/traffic/BRONX/congestion QoS0
+[SUB: COMMAND CENTER] STDOUT:   🚦  QoS0  TTL:60s novapulse/traffic/BRONX/congestion
+     Congestion: 0.63 | Vehicles: 113 | Grand Concourse × Fordham Rd
+     Props: source=novapulse-traffic-publisher | zone=BRONX | priority=NORMAL | unit=vehicles | data-type=congestion
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-environment-publisher → novapulse/environment/EAST/water_quality/reading QoS0
+[SUB: COMMAND CENTER] STDOUT:   🌿  QoS0  TTL:300s novapulse/environment/EAST/water_quality/reading
+[SUB: COMMAND CENTER] STDOUT:      Water-Sensor Sumida River: 58WQI [MODERATE]
+     Props: source=novapulse-environment-publisher | sensor-id=SNS-005 | sensor-type=water_quality | zone=EAST | unit=WQI | quality=MODERATE
+
+[PUB: TRAFFIC] STDOUT:   📊 Published: 150 | Inflight: 0/10 | Queue: 0
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-traffic-publisher → novapulse/traffic/BRONX/congestion QoS0
+[SUB: COMMAND CENTER] STDOUT:   🚦  QoS0  TTL:60s novapulse/traffic/BRONX/congestion
+     Congestion: 0.58 | Vehicles: 104 | Grand Concourse × Fordham Rd
+     Props: source=novapulse-traffic-publisher | zone=BRONX | priority=NORMAL | unit=vehicles | data-type=congestion
+
+[PUB: EMERGENCY] STDOUT:   🚨 NEW ALERT [MEDIUM]: FIRE at Centro (EAST)
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-environment-publisher → novapulse/environment/summary QoS1 [RETAIN]
+[SUB: COMMAND CENTER] STDOUT:   🌿  QoS1  TTL:600s novapulse/environment/summary
+     Props: source=novapulse-environment-publisher | data-type=summary | retained=true
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-emergency-publisher → novapulse/emergency/alert/new QoS2
+[SUB: COMMAND CENTER] STDOUT:   🚨  QoS2  TTL:7200s novapulse/emergency/alert/new
+     Alert: ALRT-8A51E84C | MEDIUM FIRE at Centro
+[SUB: COMMAND CENTER] STDOUT:      Props: source=novapulse-emergency-publisher | severity=MEDIUM | alert-type=FIRE | zone=EAST | priority=NORMAL
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-environment-publisher → novapulse/environment/WEST/temperature/reading QoS0
+[SUB: COMMAND CENTER] STDOUT:   🌿  QoS0  TTL:300s novapulse/environment/WEST/temperature/reading
+     Temp-Sensor Shibuya: 28.2°C [GOOD]
+     Props: source=novapulse-environment-publisher | sensor-id=SNS-002 | sensor-type=temperature | zone=WEST | unit=°C | quality=GOOD
+
+[CORE: MQTT BROKER] STDOUT:   ⬆ PUBLISH: novapulse-traffic-publisher → novapulse/traffic/BROOKLYN/congestion QoS0
+[SUB: COMMAND CENTER] STDOUT:   🚦  QoS0  TTL:60s novapulse/traffic/BROOKLYN/congestion
+     Congestion: 0 | Vehicles: 0 | Flatbush Ave × Atlantic Ave
+     Props: source=novapulse-traffic-publisher | zone=BROOKLYN | priority=NORMAL | unit=vehicles | data-type=congestion
+
