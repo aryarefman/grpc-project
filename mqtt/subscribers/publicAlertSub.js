@@ -84,9 +84,18 @@ client.on('message', (topic, payload, packet) => {
   try { data = JSON.parse(payload.toString()); } catch { data = payload.toString(); }
 
   const userProps = data._props?.userProperties || {};
+  const expiry = data._props?.messageExpiryInterval;
   const isRetained = packet.retain;
   const isShared = topic.includes('emergency/alert/new');
   if (isShared) stats.shared++;
+
+  // ── Simulated MQTT 5.0 Expiry Logic ───────────────────────────────────────
+  if (expiry && data.timestamp) {
+    if (Date.now() - data.timestamp > expiry * 1000) {
+      // Message has expired in the broker queue, drop it!
+      return;
+    }
+  }
 
   // ── LWT / Status messages ────────────────────────────────────────────
   if (topic.startsWith('novapulse/system/status/')) {

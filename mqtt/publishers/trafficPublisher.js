@@ -10,7 +10,7 @@ const chalk = require('chalk');
 const { v4: uuidv4 } = require('uuid');
 const { TOPICS, ZONES } = require('../shared/topicRegistry');
 const { QOS, EXPIRY, FlowControlledPublisher } = require('../shared/mqttFeatures');
-const RequestResponseHandler = require('../shared/requestResponse');
+const ResponseHandler = require('../shared/responseHandler');
 
 const CLIENT_ID = 'novapulse-traffic-publisher';
 
@@ -35,7 +35,6 @@ const client = mqtt.connect(brokerUrl, {
     payload: JSON.stringify({
       publisher: CLIENT_ID,
       status: 'OFFLINE',
-      lastSeen: Date.now(),
       message: '⚠️ Traffic Sensor System disconnected unexpectedly!',
       _props: { userProperties: { 'alert-level': 'CRITICAL', 'source': CLIENT_ID } }
     }),
@@ -45,7 +44,7 @@ const client = mqtt.connect(brokerUrl, {
 });
 
 let flowCtrl;
-let reqResHandler;
+let responder;
 let publishCount = 0;
 
 client.on('connect', () => {
@@ -54,7 +53,7 @@ client.on('connect', () => {
   console.log(chalk.cyan.bold('  ║') + chalk.white.bold('   🚦 Traffic Sensor Publisher - ONLINE              ') + chalk.cyan.bold('║'));
   console.log(chalk.cyan.bold('  ╠══════════════════════════════════════════════════════╣'));
   console.log(chalk.cyan.bold('  ║') + chalk.green('   ClientID: ' + CLIENT_ID.padEnd(38)) + chalk.cyan.bold('║'));
-  console.log(chalk.cyan.bold('  ║') + chalk.yellow('   Protocol: MQTT 5.0 | LWT: Registered'.padEnd(51)) + chalk.cyan.bold('║'));
+  console.log(chalk.cyan.bold('  ║') + chalk.yellow('   Protocol: MQTT 3.1.1 | LWT: Registered'.padEnd(51)) + chalk.cyan.bold('║'));
   console.log(chalk.cyan.bold('  ║') + chalk.magenta('   Features: QoS, Alias, Props, Retain, Expiry'.padEnd(51)) + chalk.cyan.bold('║'));
   console.log(chalk.cyan.bold('  ╚══════════════════════════════════════════════════════╝'));
   console.log('');
@@ -69,10 +68,10 @@ client.on('connect', () => {
   );
 
   flowCtrl = new FlowControlledPublisher(client);
-  reqResHandler = new RequestResponseHandler(client);
+  responder = new ResponseHandler(client);
 
   // Handle request-response (Feature 8)
-  reqResHandler.setupRequestHandler((request) => {
+  responder.setupHandler((request) => {
     console.log(chalk.yellow(`  ⟵ REQUEST received: ${request.command}`));
     if (request.command === 'GET_STATUS') {
       return { status: 'OK', publisher: CLIENT_ID, uptime: process.uptime(), intersections: intersections.length, publishCount, flowControl: flowCtrl.getStats() };
@@ -80,7 +79,7 @@ client.on('connect', () => {
     if (request.command === 'GET_INTERSECTIONS') {
       return { intersections };
     }
-    return { error: 'Unknown command' };
+    return null;
   });
 
   // Start publishing

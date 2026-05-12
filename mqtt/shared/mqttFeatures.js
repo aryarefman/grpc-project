@@ -43,7 +43,6 @@ class FlowControlledPublisher {
   }
 
   publish(topic, payload, options = {}) {
-    // Rate limiting check
     const now = Date.now();
     if (now - this.windowStart >= 1000) {
       this.publishCount = 0;
@@ -54,12 +53,25 @@ class FlowControlledPublisher {
       if (this.queue.length < FLOW_CONTROL.QUEUE_MAX_SIZE) {
         this.queue.push({ topic, payload, options });
         this.totalQueued++;
+        this._scheduleDrain();
       }
       return false;
     }
 
     this._doPublish(topic, payload, options);
     return true;
+  }
+
+  _scheduleDrain() {
+    if (this.drainTimer) return;
+    
+    const now = Date.now();
+    const timeToWait = Math.max(0, 1000 - (now - this.windowStart) + 10);
+    
+    this.drainTimer = setTimeout(() => {
+      this.drainTimer = null;
+      this._drainQueue();
+    }, timeToWait);
   }
 
   _doPublish(topic, payload, options) {
@@ -75,9 +87,23 @@ class FlowControlledPublisher {
   }
 
   _drainQueue() {
-    while (this.queue.length > 0 && this.inflightCount < this.maxInflight) {
+    const now = Date.now();
+    if (now - this.windowStart >= 1000) {
+      this.publishCount = 0;
+      this.windowStart = now;
+    }
+
+    while (
+      this.queue.length > 0 && 
+      this.inflightCount < this.maxInflight &&
+      this.publishCount < this.rateLimit
+    ) {
       const msg = this.queue.shift();
       this._doPublish(msg.topic, msg.payload, msg.options);
+    }
+
+    if (this.queue.length > 0) {
+      this._scheduleDrain();
     }
   }
 

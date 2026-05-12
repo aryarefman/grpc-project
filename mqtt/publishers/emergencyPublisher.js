@@ -9,7 +9,7 @@ const chalk = require('chalk');
 const { v4: uuidv4 } = require('uuid');
 const { TOPICS, ZONES } = require('../shared/topicRegistry');
 const { QOS, EXPIRY, FlowControlledPublisher } = require('../shared/mqttFeatures');
-const RequestResponseHandler = require('../shared/requestResponse');
+const ResponseHandler = require('../shared/responseHandler');
 
 const CLIENT_ID = 'novapulse-emergency-publisher';
 
@@ -33,7 +33,7 @@ const client = mqtt.connect(brokerUrl, {
   clean: true,
   will: {
     topic: TOPICS.SYSTEM.STATUS('emergency-publisher'),
-    payload: JSON.stringify({ publisher: CLIENT_ID, status: 'OFFLINE', lastSeen: Date.now(), message: '⚠️ Emergency Dispatch System disconnected!', _props: { userProperties: { 'alert-level': 'CRITICAL', 'source': CLIENT_ID } } }),
+    payload: JSON.stringify({ publisher: CLIENT_ID, status: 'OFFLINE', message: '⚠️ Emergency Dispatch System disconnected!', _props: { userProperties: { 'alert-level': 'CRITICAL', 'source': CLIENT_ID } } }),
     qos: 1,
     retain: true,
   },
@@ -48,7 +48,7 @@ client.on('connect', () => {
   console.log(chalk.red.bold('  ║') + chalk.white.bold('   🚨 Emergency Dispatch Publisher - ONLINE          ') + chalk.red.bold('║'));
   console.log(chalk.red.bold('  ╠══════════════════════════════════════════════════════╣'));
   console.log(chalk.red.bold('  ║') + chalk.cyan('   Units: ' + units.length + ' | Status: All systems nominal'.padEnd(41)) + chalk.red.bold('║'));
-  console.log(chalk.red.bold('  ║') + chalk.yellow('   Protocol: MQTT 5.0 | LWT: Registered'.padEnd(51)) + chalk.red.bold('║'));
+  console.log(chalk.red.bold('  ║') + chalk.yellow('   Protocol: MQTT 3.1.1 | LWT: Registered'.padEnd(51)) + chalk.red.bold('║'));
   console.log(chalk.red.bold('  ╚══════════════════════════════════════════════════════╝'));
   console.log('');
 
@@ -58,16 +58,16 @@ client.on('connect', () => {
   );
 
   flowCtrl = new FlowControlledPublisher(client);
-  const reqRes = new RequestResponseHandler(client);
+  const responder = new ResponseHandler(client);
 
-  reqRes.setupRequestHandler((request) => {
+  responder.setupHandler((request) => {
     console.log(chalk.yellow(`  ⟵ REQUEST: ${request.command}`));
     if (request.command === 'GET_STATUS') {
       return { status: 'OK', publisher: CLIENT_ID, uptime: process.uptime(), units: units.length, activeAlerts: activeAlerts.length, publishCount };
     }
     if (request.command === 'GET_UNITS') return { units };
     if (request.command === 'GET_ALERTS') return { alerts: activeAlerts };
-    return { error: 'Unknown command' };
+    return null;
   });
 
   startAlertPublisher();

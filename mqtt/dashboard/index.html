@@ -291,6 +291,7 @@
             <div class="pub-stat"><span class="pub-stat-val" id="pub-traffic-count">0</span><span class="pub-stat-lbl">SENT</span></div>
             <div class="pub-stat"><span class="pub-stat-val" id="pub-traffic-rate">0/s</span><span class="pub-stat-lbl">RATE</span></div>
           </div>
+
           <div class="pub-lwt" id="pub-traffic-lwt">LWT: STANDBY</div>
         </div>
         <div class="publisher-card" id="pub-environment">
@@ -303,6 +304,7 @@
             <div class="pub-stat"><span class="pub-stat-val" id="pub-environment-count">0</span><span class="pub-stat-lbl">SENT</span></div>
             <div class="pub-stat"><span class="pub-stat-val" id="pub-environment-rate">0/s</span><span class="pub-stat-lbl">RATE</span></div>
           </div>
+
           <div class="pub-lwt" id="pub-environment-lwt">LWT: STANDBY</div>
         </div>
         <div class="publisher-card" id="pub-emergency">
@@ -315,6 +317,7 @@
             <div class="pub-stat"><span class="pub-stat-val" id="pub-emergency-count">0</span><span class="pub-stat-lbl">SENT</span></div>
             <div class="pub-stat"><span class="pub-stat-val" id="pub-emergency-rate">0/s</span><span class="pub-stat-lbl">RATE</span></div>
           </div>
+
           <div class="pub-lwt" id="pub-emergency-lwt">LWT: STANDBY</div>
         </div>
       </div>
@@ -395,8 +398,17 @@
         <button class="btn-icon" onclick="toggleControls()"><svg class="icon-sm"><use href="#icon-close"></use></svg></button>
       </div>
       <div class="controls-grid">
-        <button class="btn btn-primary" id="btn-send-command" onclick="sendCommand()">
-          <svg class="icon-sm"><use href="#icon-send"></use></svg> SEND COMMAND
+        <button class="btn btn-primary" id="btn-send-command" onclick="sendCommand('GET_STATUS')">
+          <svg class="icon-sm"><use href="#icon-send"></use></svg> REQ: STATUS
+        </button>
+        <button class="btn btn-primary" onclick="sendCommand('GET_ALERTS')" style="background: var(--orange); border-color: var(--orange);">
+          <svg class="icon-sm"><use href="#icon-shield"></use></svg> REQ: ALERTS
+        </button>
+        <button class="btn btn-primary" onclick="sendCommand('GET_INTERSECTIONS')" style="background: var(--cyan); border-color: var(--cyan);">
+          <svg class="icon-sm"><use href="#icon-activity"></use></svg> REQ: TRAFFIC
+        </button>
+        <button class="btn btn-primary" onclick="sendCommand('GET_SENSORS')" style="background: var(--green); border-color: var(--green);">
+          <svg class="icon-sm"><use href="#icon-leaf"></use></svg> REQ: SENSORS
         </button>
         <button class="btn btn-danger" id="btn-burst" onclick="burstTest()">
           <svg class="icon-sm"><use href="#icon-zap"></use></svg> BURST TEST

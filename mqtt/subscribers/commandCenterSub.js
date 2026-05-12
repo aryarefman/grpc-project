@@ -8,7 +8,7 @@
 const mqtt = require('mqtt');
 const chalk = require('chalk');
 const { WILDCARDS, TOPICS } = require('../shared/topicRegistry');
-const RequestResponseHandler = require('../shared/requestResponse');
+const RequestSender = require('../shared/requestSender');
 
 const CLIENT_ID = 'novapulse-command-center';
 
@@ -40,7 +40,7 @@ client.on('connect', () => {
   console.log(chalk.magenta.bold('  ╚══════════════════════════════════════════════════════╝'));
   console.log('');
 
-  reqRes = new RequestResponseHandler(client);
+  reqRes = new RequestSender(client);
 
   // Feature 2: Multi-level wildcard (#) - subscribe to ALL topics
   client.subscribe(WILDCARDS.ALL, { qos: 1 }, (err) => {
@@ -64,8 +64,8 @@ client.on('message', (topic, payload, packet) => {
   stats.totalMessages++;
   stats.byQoS[packet.qos]++;
 
-  // Handle request-response replies
-  if (reqRes && reqRes.handleResponse(topic, payload, packet)) return;
+  // We no longer handle responses here, RequestSender handles them internally
+  if (topic.startsWith('novapulse/system/command/response/')) return;
 
   let data;
   try { data = JSON.parse(payload.toString()); } catch { data = payload.toString(); }
@@ -74,6 +74,14 @@ client.on('message', (topic, payload, packet) => {
   const isRetained = packet.retain;
   const userProps = data._props?.userProperties || {};
   const expiry = data._props?.messageExpiryInterval;
+
+  // ── Simulated MQTT 5.0 Expiry Logic ───────────────────────────────────────
+  if (expiry && data.timestamp) {
+    if (Date.now() - data.timestamp > expiry * 1000) {
+      // Message has expired in the broker queue, drop it!
+      return;
+    }
+  }
 
   if (isRetained) stats.retainedReceived++;
 

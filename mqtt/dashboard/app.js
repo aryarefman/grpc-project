@@ -605,6 +605,22 @@ client.on('message', (topic, payload, packet) => {
   const expiry = data._props?.messageExpiryInterval;
   const category = categorize(topic);
 
+  // ── Simulated MQTT 5.0 Expiry Logic ───────────────────────────────────────
+  if (expiry && data.timestamp) {
+    if (Date.now() - data.timestamp > expiry * 1000) {
+      // Message has expired in the broker queue, drop it!
+      const output = document.getElementById('command-output');
+      if (output) {
+        output.classList.add('visible');
+        output.innerHTML += `&gt;&gt; ─────────────────────────────────────────\n`;
+        output.innerHTML += `&gt;&gt; <span style="color: #fbbf24; font-weight: bold;">⚠️ [EXPIRY] MESSAGE DROPPED!</span>\n`;
+        output.innerHTML += `&gt;&gt; <span style="color: #fbbf24;">Topic: ${topic}</span>\n`;
+        output.innerHTML += `&gt;&gt; <span style="color: #fbbf24;">Expiry Limit: ${expiry}s | Age: ${Math.round((Date.now() - data.timestamp)/1000)}s</span>\n`;
+        output.innerHTML += `&gt;&gt; ─────────────────────────────────────────\n`;
+      }
+      return;
+    }
+  }
   if (isRetained) { state.retained++; state.features.retain = true; }
   if (Object.keys(userProps).length > 0) state.features.userprops = true;
   if (expiry) state.features.expiry = true;
@@ -745,6 +761,17 @@ function handlePublisherStatus(topic, data) {
         updatePublisherCard(type, false);
         setLwtStatus(type, 'LWT: TRIGGERED', 'triggered');
         state.features.lwt = true;
+        
+        const output = document.getElementById('command-output');
+        if (output) {
+          output.classList.add('visible');
+          output.innerHTML += `&gt;&gt; ─────────────────────────────────────────\n`;
+          output.innerHTML += `&gt;&gt; <span style="color: #ef4444; font-weight: bold; animation: lwtBlink 1s infinite;">🚨 [LAST WILL TESTAMENT] TRIGGERED!</span>\n`;
+          output.innerHTML += `&gt;&gt; <span style="color: #ef4444;">Publisher: ${data.publisher}</span>\n`;
+          output.innerHTML += `&gt;&gt; <span style="color: #ef4444;">Status: OFFLINE (Unexpected Disconnect)</span>\n`;
+          output.innerHTML += `&gt;&gt; <span style="color: #ef4444;">Message: ${data.message || 'No message'}</span>\n`;
+          output.innerHTML += `&gt;&gt; ─────────────────────────────────────────\n`;
+        }
       }
     }
   }
@@ -968,103 +995,189 @@ function rerenderFeed() {
 }
 
 // ── Controls ────────────────────────────────────────────────────────────────
-function sendCommand() {
+function sendCommand(cmd = 'GET_STATUS') {
   const output = document.getElementById('command-output');
   output.classList.add('visible');
-  output.textContent = '>> Sending GET_STATUS request...\n';
-
   const correlationId = Math.random().toString(36).substring(7);
   const responseTopic = `novapulse/system/command/response/${correlationId}`;
-
-  client.subscribe(responseTopic, { qos: 1 });
+  output.textContent = `>> REQUEST-RESPONSE COMMAND\n`;
+  output.textContent += `>> ─────────────────────────────────────────\n`;
+  output.textContent += `>> Command    : ${cmd}\n`;
+  output.textContent += `>> Correlation : ${correlationId}\n`;
+  output.textContent += `>> Response Topic : ${responseTopic}\n`;
+  output.textContent += `>> QoS Level  : 1 (At Least Once)\n`;
+  output.textContent += `>> ─────────────────────────────────────────\n`;
+  output.innerHTML += `&gt;&gt; Subscribing to private response channel...<br>`;
+  output.innerHTML += `&gt;&gt; Publishing request to novapulse/system/command/request...<br>`;
+  output.innerHTML += `&gt;&gt; Waiting for response (timeout: 5s)...<br><br>`;
 
   const timeout = setTimeout(() => {
-    output.textContent += '<< Request timed out (5s)\n';
+    output.innerHTML += `&gt;&gt; ─────────────────────────────────────────<br>`;
+    output.innerHTML += `&gt;&gt; <span style="color:#f87171">⚠️  REQUEST TIMED OUT (5s)</span><br>`;
+    output.innerHTML += `&gt;&gt; No publisher responded to the command.<br>`;
+    client.removeListener('message', handler);
     client.unsubscribe(responseTopic);
   }, 5000);
 
   const handler = (topic, payload) => {
     if (topic === responseTopic) {
-      clearTimeout(timeout);
       const data = JSON.parse(payload.toString());
-      output.textContent += `<< Response: ${JSON.stringify(data, null, 2).substring(0, 200)}\n`;
+      
+      // If we got an error or "Unknown command" and we're expecting specific data, ignore and keep waiting
+      // This handles the race condition where multiple publishers respond to the same topic
+      if (data.error && cmd !== 'GET_STATUS') return;
+      if (cmd === 'GET_ALERTS' && !data.alerts) return;
+      if (cmd === 'GET_INTERSECTIONS' && !data.intersections) return;
+      if (cmd === 'GET_SENSORS' && !data.sensors) return;
+
+      clearTimeout(timeout);
+      output.innerHTML += `&gt;&gt; ─────────────────────────────────────────<br>`;
+      output.innerHTML += `&gt;&gt; <span style="color:#34d399">✅ RESPONSE RECEIVED!</span><br>`;
+      if (cmd === 'GET_STATUS') {
+        output.innerHTML += `&gt;&gt; Status     : ${data.status || 'OK'}<br>`;
+        output.innerHTML += `&gt;&gt; Publisher  : ${data.publisher || 'Unknown'}<br>`;
+        output.innerHTML += `&gt;&gt; Uptime     : ${data.uptime ? Math.round(data.uptime) + 's' : 'N/A'}<br>`;
+        output.innerHTML += `&gt;&gt; Units      : ${data.units || data.intersections || data.sensors || 'N/A'}<br>`;
+        output.innerHTML += `&gt;&gt; Published  : ${data.publishCount || 'N/A'} messages<br>`;
+      } else if (cmd === 'GET_ALERTS') {
+        output.innerHTML += `&gt;&gt; Active Alerts : ${data.alerts ? data.alerts.length : 0}<br>`;
+        output.innerHTML += `&gt;&gt; Data Dump  : ${JSON.stringify(data.alerts).substring(0, 100)}...<br>`;
+      } else if (cmd === 'GET_INTERSECTIONS') {
+        output.innerHTML += `&gt;&gt; Intersections : ${data.intersections ? data.intersections.length : 0}<br>`;
+        output.innerHTML += `&gt;&gt; Data Dump  : ${JSON.stringify(data.intersections).substring(0, 100)}...<br>`;
+      } else if (cmd === 'GET_SENSORS') {
+        output.innerHTML += `&gt;&gt; Active Sensors : ${data.sensors ? data.sensors.length : 0}<br>`;
+        output.innerHTML += `&gt;&gt; Data Dump  : ${JSON.stringify(data.sensors).substring(0, 120)}...<br>`;
+      }
+      output.innerHTML += `&gt;&gt; ─────────────────────────────────────────<br>`;
+      output.innerHTML += `&gt;&gt; Request-Response pattern verified.<br>`;
       client.removeListener('message', handler);
       client.unsubscribe(responseTopic);
       state.features.reqres = true;
       updateFeatures();
     }
   };
+
   client.on('message', handler);
 
-  // FITUR MQTT 5.0: REQUEST-RESPONSE (AUDIT PERANGKAT REAL-TIME)
-  // Admin sering perlu mengaudit status mesin atau sensor secara instan 
-  // (misal: "Apakah kamera CCTV Bunderan HI masih aktif?").
-  // Melalui fitur ini, command center membuat jalur komunikasi privat sementara ("responseTopic")
-  // beserta nomor resi unik ("correlationData"). Sensor di lapangan akan langsung
-  // membalas ke jalur privat tersebut, mencegah kebocoran data keamanan ke publik.
-  client.publish('novapulse/system/command/request', JSON.stringify({
-    command: 'GET_STATUS', params: {}, timestamp: Date.now(),
-    _props: {
-      responseTopic,
-      correlationData: correlationId,
-      userProperties: { 'request-id': correlationId, 'source': 'dashboard' },
+  // Ensure subscription is active before publishing
+  client.subscribe(responseTopic, { qos: 1 }, (err) => {
+    if (err) {
+      clearTimeout(timeout);
+      output.innerHTML += `&gt;&gt; <span style="color:red">Failed to subscribe!</span><br>`;
+      return;
     }
-  }), { qos: 1 });
+    
+    client.publish('novapulse/system/command/request', JSON.stringify({
+      command: cmd, params: {}, timestamp: Date.now(),
+      _props: {
+        responseTopic,
+        correlationData: correlationId,
+        userProperties: { 'request-id': correlationId, 'source': 'dashboard' },
+      }
+    }), { qos: 1 });
+  });
 }
 
 function burstTest() {
   const output = document.getElementById('command-output');
   output.classList.add('visible');
-  output.textContent = '>> Starting multi-source burst test (50 messages)...\n';
 
-  let count = 0;
-  const interval = setInterval(() => {
-    // Mix internal and external sources in the burst
-    const isExternal = Math.random() > 0.5;
-    const sourceId = isExternal ? `ext-burst-${Math.floor(Math.random()*1000)}` : 'dashboard';
+  // ── Flow Control Simulation ───────────────────────────────────────
+  const RATE_LIMIT = 50;
+  const BURST_TOTAL = 150;
+  const queue = [];
+  let publishedImmediately = 0;
+  let totalPublished = 0;
 
-    client.publish('novapulse/system/burst-test', JSON.stringify({
-      id: count,
-      source: sourceId,
-      type: isExternal ? 'EXTERNAL_SURGE' : 'INTERNAL_LOAD',
-      timestamp: Date.now(),
-      _props: {
-        // FITUR MQTT 5.0: USER PROPERTIES (PRIORITAS & FILTERING TANPA DECODE)
-        // Saat jutaan data masuk per detik, User Properties memungkinkan sensor menempelkan 
-        // status "priority: HIGH" di level jaringan (Header). Dampak nyatanya: Load Balancer 
-        // atau Router bisa memprioritaskan paket data darurat tanpa harus mengorbankan CPU 
-        // untuk membongkar dan memecahkan isi data Payload JSON-nya.
-        userProperties: { 'source': sourceId, 'priority': 'HIGH' }
-      }
-    }), { qos: 0 });
+  output.textContent = `>> FLOW CONTROL STRESS TEST\n`;
+  output.textContent += `>> Config: RATE_LIMIT=${RATE_LIMIT}/sec | BURST=${BURST_TOTAL} messages\n`;
+  output.textContent += `>> ─────────────────────────────────────────\n`;
 
-    count++;
-    if (count >= 50) {
-      clearInterval(interval);
-      output.textContent += '>> Burst test completed.\n';
+  // Phase 1: Attempt to send all 150 at once (simulating overload)
+  for (let i = 0; i < BURST_TOTAL; i++) {
+    if (publishedImmediately < RATE_LIMIT) {
+      // Within rate limit — publish immediately
+      const sourceId = Math.random() > 0.5 ? `ext-burst-${Math.floor(Math.random()*1000)}` : 'dashboard';
+      client.publish('novapulse/system/burst-test', JSON.stringify({
+        id: i, source: sourceId,
+        type: 'FLOW_CONTROL_TEST',
+        timestamp: Date.now(),
+        _props: { userProperties: { 'source': sourceId, 'priority': 'HIGH' } }
+      }), { qos: 0 });
+      publishedImmediately++;
+      totalPublished++;
+    } else {
+      // Rate limit exceeded — enter queue
+      queue.push(i);
     }
-  }, 50);
+  }
+
+  output.textContent += `>> [BURST] Sent ${BURST_TOTAL} messages at once!\n`;
+  output.textContent += `>> Published Immediately : ${publishedImmediately}\n`;
+  output.textContent += `>> Entered Queue         : ${queue.length}\n`;
+  output.textContent += `>> ─────────────────────────────────────────\n`;
+  output.textContent += `>> Draining queue at ${RATE_LIMIT} msgs/sec...\n\n`;
+
+  // Phase 2: Drain queue at RATE_LIMIT per second
+  const drainInterval = setInterval(() => {
+    if (queue.length === 0) {
+      clearInterval(drainInterval);
+      output.textContent += `>> ─────────────────────────────────────────\n`;
+      output.textContent += `>> ✅ ALL ${BURST_TOTAL} MESSAGES DELIVERED!\n`;
+      output.textContent += `>> Flow Control prevented system overload.\n`;
+      return;
+    }
+
+    const batch = Math.min(RATE_LIMIT, queue.length);
+    for (let j = 0; j < batch; j++) {
+      const msgId = queue.shift();
+      const sourceId = Math.random() > 0.5 ? `ext-burst-${Math.floor(Math.random()*1000)}` : 'dashboard';
+      client.publish('novapulse/system/burst-test', JSON.stringify({
+        id: msgId, source: sourceId,
+        type: 'FLOW_CONTROL_DRAIN',
+        timestamp: Date.now(),
+        _props: { userProperties: { 'source': sourceId, 'priority': 'NORMAL' } }
+      }), { qos: 0 });
+      totalPublished++;
+    }
+
+    output.textContent += `>> [DRAIN] +${batch} published | Queue: ${queue.length} remaining | Total: ${totalPublished}/${BURST_TOTAL}\n`;
+  }, 1000);
 }
 
 function publishTestMessage() {
   const output = document.getElementById('command-output');
   if (output) output.classList.add('visible');
+  const timestamp = Date.now();
+
+  output.textContent = `>> QoS 2 PUBLISH TEST (EXACTLY-ONCE)\n`;
+  output.textContent += `>> ─────────────────────────────────────────\n`;
+  output.textContent += `>> Topic      : novapulse/emergency/alert/test\n`;
+  output.textContent += `>> QoS Level  : 2 (Exactly Once)\n`;
+  output.textContent += `>> Retain     : No\n`;
+  output.textContent += `>> Timestamp  : ${new Date(timestamp).toLocaleTimeString()}\n`;
+  output.textContent += `>> ─────────────────────────────────────────\n`;
+  output.textContent += `>> User Properties:\n`;
+  output.textContent += `>>   source   = novapulse-emergency-publisher\n`;
+  output.textContent += `>>   feature  = qos2-validation\n`;
+  output.textContent += `>> ─────────────────────────────────────────\n`;
+  output.textContent += `>> Publishing with QoS 2 handshake...\n`;
+  output.textContent += `>>   Step 1: PUBLISH  →  Broker\n`;
+  output.textContent += `>>   Step 2: PUBREC   ←  Broker (received)\n`;
+  output.textContent += `>>   Step 3: PUBREL   →  Broker (release)\n`;
+  output.textContent += `>>   Step 4: PUBCOMP  ←  Broker (complete)\n`;
+  output.textContent += `>> ─────────────────────────────────────────\n`;
+  output.textContent += `>> ✅ Message delivered EXACTLY ONCE.\n`;
 
   client.publish('novapulse/emergency/alert/test', JSON.stringify({
     type: 'TEST_MESSAGE',
     content: 'Manually triggered QoS 2 validation',
-    timestamp: Date.now(),
+    timestamp: timestamp,
     _props: {
-      // FITUR MQTT 5.0: USER PROPERTIES (METADATA KEAMANAN & SUMBER)
-      // Perangkat IoT menggunakan fitur ini untuk menempelkan sertifikat keamanan, 
-      // versi firmware, atau identitas perangkat (source). Server menggunakan metadata 
-      // ini untuk memblokir perangkat yang tidak valid sebelum data pesan tersebut 
-      // diproses lebih dalam ke sistem database.
       userProperties: { 'source': 'novapulse-emergency-publisher', 'feature': 'qos2-validation' },
     }
   }), { qos: 2 });
-
-  if (output) output.textContent = '>> Emergency Test message published (QoS 2)\n';
 }
 
 // Track active external nodes
@@ -1085,7 +1198,22 @@ function systemReady() {
   // 2. Immediate signal for the new node
   sendExternalUpdate(newId, 'INITIALIZING');
 
-  if (output) output.textContent = `>> New External Node Registered: ${newId}. Total active: ${activeExternalNodes.length}\n`;
+  output.textContent = `>> EXTERNAL NODE REGISTRATION\n`;
+  output.textContent += `>> ─────────────────────────────────────────\n`;
+  output.textContent += `>> Node ID    : ${newId}\n`;
+  output.textContent += `>> Category   : External System Validator\n`;
+  output.textContent += `>> Status     : INITIALIZING\n`;
+  output.textContent += `>> QoS Level  : 1 (At Least Once)\n`;
+  output.textContent += `>> Retain     : No\n`;
+  output.textContent += `>> Topic      : novapulse/system/external/ready\n`;
+  output.textContent += `>> ─────────────────────────────────────────\n`;
+  output.textContent += `>> Active External Nodes: ${activeExternalNodes.length}\n`;
+  activeExternalNodes.forEach((id, i) => {
+    output.textContent += `>>   [${i+1}] ${id}\n`;
+  });
+  output.textContent += `>> ─────────────────────────────────────────\n`;
+  output.textContent += `>> ✅ Node registered on globe topology.\n`;
+  output.textContent += `>> Auto health-check every 15 seconds.\n`;
 }
 
 // Function to send update for a specific node

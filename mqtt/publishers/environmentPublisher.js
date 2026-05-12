@@ -10,7 +10,7 @@ const chalk = require('chalk');
 const { v4: uuidv4 } = require('uuid');
 const { TOPICS, ZONES, SENSOR_TYPES } = require('../shared/topicRegistry');
 const { QOS, EXPIRY, FlowControlledPublisher } = require('../shared/mqttFeatures');
-const RequestResponseHandler = require('../shared/requestResponse');
+const ResponseHandler = require('../shared/responseHandler');
 
 const CLIENT_ID = 'novapulse-environment-publisher';
 
@@ -45,7 +45,6 @@ const client = mqtt.connect(brokerUrl, {
     payload: JSON.stringify({
       publisher: CLIENT_ID,
       status: 'OFFLINE',
-      lastSeen: Date.now(),
       message: '⚠️ Environment Sensor System disconnected unexpectedly!',
       _props: { userProperties: { 'alert-level': 'CRITICAL', 'source': CLIENT_ID } }
     }),
@@ -63,7 +62,7 @@ client.on('connect', () => {
   console.log(chalk.green.bold('  ║') + chalk.white.bold('   🌿 Environment Sensor Publisher - ONLINE          ') + chalk.green.bold('║'));
   console.log(chalk.green.bold('  ╠══════════════════════════════════════════════════════╣'));
   console.log(chalk.green.bold('  ║') + chalk.cyan('   Sensors: ' + sensors.length + ' active across ' + new Set(sensors.map(s => s.zone)).size + ' zones'.padEnd(27)) + chalk.green.bold('║'));
-  console.log(chalk.green.bold('  ║') + chalk.yellow('   Protocol: MQTT 5.0 | LWT: Registered'.padEnd(51)) + chalk.green.bold('║'));
+  console.log(chalk.green.bold('  ║') + chalk.yellow('   Protocol: MQTT 3.1.1 | LWT: Registered'.padEnd(51)) + chalk.green.bold('║'));
   console.log(chalk.green.bold('  ╚══════════════════════════════════════════════════════╝'));
   console.log('');
 
@@ -76,10 +75,10 @@ client.on('connect', () => {
   );
 
   flowCtrl = new FlowControlledPublisher(client);
-  const reqRes = new RequestResponseHandler(client);
+  const responder = new ResponseHandler(client);
 
   // Request-Response handler
-  reqRes.setupRequestHandler((request) => {
+  responder.setupHandler((request) => {
     console.log(chalk.yellow(`  ⟵ REQUEST: ${request.command}`));
     if (request.command === 'GET_STATUS') {
       return { status: 'OK', publisher: CLIENT_ID, uptime: process.uptime(), sensors: sensors.length, publishCount };
@@ -90,9 +89,9 @@ client.on('connect', () => {
     if (request.command === 'RESET_SENSOR' && request.params?.sensorId) {
       const sensor = sensors.find(s => s.id === request.params.sensorId);
       if (sensor) { sensor.value = 0; return { success: true, sensor }; }
-      return { success: false, error: 'Sensor not found' };
+      return null;
     }
-    return { error: 'Unknown command' };
+    return null;
   });
 
   startSensorPublisher();
