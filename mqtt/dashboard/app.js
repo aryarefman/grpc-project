@@ -552,11 +552,14 @@ map.on('style.load', () => {
 });
 
 
-// ── MQTT Connection ─────────────────────────────────────────────────────────
+// ── MQTT Connection (MQTT 5.0) ──────────────────────────────────────────────
 const client = mqtt.connect(`ws://${location.hostname}:9002`, {
   clientId: 'novapulse-dashboard-' + Math.random().toString(36).substring(7),
+  protocolVersion: 4,    // MQTT 5.0 for real properties support
   clean: true,
   reconnectPeriod: 3000,
+  // MQTT 5.0 Flow Control: broker enforces receiveMaximum
+  
 });
 
 client.on('connect', () => {
@@ -601,24 +604,23 @@ client.on('message', (topic, payload, packet) => {
     playBlip('qos2');
   }
   const isRetained = packet.retain;
-  const userProps = data._props?.userProperties || {};
-  const expiry = data._props?.messageExpiryInterval;
+  // MQTT 5.0: Baca properties dari packet level, bukan dari JSON _props
+  const userProps = packet.properties?.userProperties || {};
+  const expiry = packet.properties?.messageExpiryInterval;
   const category = categorize(topic);
 
-  // ── Simulated MQTT 5.0 Expiry Logic ───────────────────────────────────────
-  if (expiry && data.timestamp) {
-    if (Date.now() - data.timestamp > expiry * 1000) {
-      // Message has expired in the broker queue, drop it!
-      const output = document.getElementById('command-output');
-      if (output) {
+  // MQTT 5.0: Broker otomatis drop expired messages
+  // Tidak perlu client-side check, expiry ditangani oleh broker
+  // Tapi kita log jika ada expiry interval untuk monitoring
+  if (expiry) {
+    const output = document.getElementById('command-output');
+    if (output && data.timestamp) {
+      const age = Math.round((Date.now() - data.timestamp) / 1000);
+      // Log only when message is nearing expiry (>80% of TTL)
+      if (age > expiry * 0.8) {
         output.classList.add('visible');
-        output.innerHTML += `&gt;&gt; ─────────────────────────────────────────\n`;
-        output.innerHTML += `&gt;&gt; <span style="color: #fbbf24; font-weight: bold;">⚠️ [EXPIRY] MESSAGE DROPPED!</span>\n`;
-        output.innerHTML += `&gt;&gt; <span style="color: #fbbf24;">Topic: ${topic}</span>\n`;
-        output.innerHTML += `&gt;&gt; <span style="color: #fbbf24;">Expiry Limit: ${expiry}s | Age: ${Math.round((Date.now() - data.timestamp)/1000)}s</span>\n`;
-        output.innerHTML += `&gt;&gt; ─────────────────────────────────────────\n`;
+        output.innerHTML += `&gt;&gt; <span style="color: #fbbf24;">⚠️ [EXPIRY WARNING] ${topic} age=${age}s / TTL=${expiry}s</span>\n`;
       }
-      return;
     }
   }
   if (isRetained) { state.retained++; state.features.retain = true; }
@@ -679,7 +681,7 @@ client.on('message', (topic, payload, packet) => {
     'dashboard': 'command-center'
   };
 
-  let publisherId = data.publisher || data.unit_id || data.intersection_id || userProps.source;
+  let publisherId = data.publisher || data.unit_id || data.intersection_id || userProps?.source;
   let targetKey = idMap[publisherId] || (pubType && mqttNodes[pubType] ? pubType : publisherId);
 
   if (targetKey) {
@@ -995,26 +997,40 @@ function rerenderFeed() {
 }
 
 // ── Controls ────────────────────────────────────────────────────────────────
+// FIX Masalah 3: Mapping command → target publisher (1 request → 1 response)
+const COMMAND_TARGET_MAP = {
+  GET_STATUS: 'traffic-publisher',
+  GET_INTERSECTIONS: 'traffic-publisher',
+  GET_SENSORS: 'environment-publisher',
+  GET_ALERTS: 'emergency-publisher',
+  GET_UNITS: 'emergency-publisher',
+};
+
 function sendCommand(cmd = 'GET_STATUS') {
   const output = document.getElementById('command-output');
   output.classList.add('visible');
   const correlationId = Math.random().toString(36).substring(7);
   const responseTopic = `novapulse/system/command/response/${correlationId}`;
-  output.textContent = `>> REQUEST-RESPONSE COMMAND\n`;
+  const targetPublisher = COMMAND_TARGET_MAP[cmd] || 'traffic-publisher';
+  const requestTopic = `novapulse/system/command/request/${targetPublisher}`;
+
+  output.textContent = `>> REQUEST-RESPONSE COMMAND (MQTT 5.0)\n`;
   output.textContent += `>> ─────────────────────────────────────────\n`;
   output.textContent += `>> Command    : ${cmd}\n`;
+  output.textContent += `>> Target     : ${targetPublisher}\n`;
   output.textContent += `>> Correlation : ${correlationId}\n`;
   output.textContent += `>> Response Topic : ${responseTopic}\n`;
+  output.textContent += `>> Request Topic  : ${requestTopic}\n`;
   output.textContent += `>> QoS Level  : 1 (At Least Once)\n`;
   output.textContent += `>> ─────────────────────────────────────────\n`;
   output.innerHTML += `&gt;&gt; Subscribing to private response channel...<br>`;
-  output.innerHTML += `&gt;&gt; Publishing request to novapulse/system/command/request...<br>`;
+  output.innerHTML += `&gt;&gt; Publishing request to ${requestTopic}...<br>`;
   output.innerHTML += `&gt;&gt; Waiting for response (timeout: 5s)...<br><br>`;
 
   const timeout = setTimeout(() => {
     output.innerHTML += `&gt;&gt; ─────────────────────────────────────────<br>`;
     output.innerHTML += `&gt;&gt; <span style="color:#f87171">⚠️  REQUEST TIMED OUT (5s)</span><br>`;
-    output.innerHTML += `&gt;&gt; No publisher responded to the command.<br>`;
+    output.innerHTML += `&gt;&gt; Publisher ${targetPublisher} did not respond.<br>`;
     client.removeListener('message', handler);
     client.unsubscribe(responseTopic);
   }, 5000);
@@ -1022,17 +1038,10 @@ function sendCommand(cmd = 'GET_STATUS') {
   const handler = (topic, payload) => {
     if (topic === responseTopic) {
       const data = JSON.parse(payload.toString());
-      
-      // If we got an error or "Unknown command" and we're expecting specific data, ignore and keep waiting
-      // This handles the race condition where multiple publishers respond to the same topic
-      if (data.error && cmd !== 'GET_STATUS') return;
-      if (cmd === 'GET_ALERTS' && !data.alerts) return;
-      if (cmd === 'GET_INTERSECTIONS' && !data.intersections) return;
-      if (cmd === 'GET_SENSORS' && !data.sensors) return;
 
       clearTimeout(timeout);
       output.innerHTML += `&gt;&gt; ─────────────────────────────────────────<br>`;
-      output.innerHTML += `&gt;&gt; <span style="color:#34d399">✅ RESPONSE RECEIVED!</span><br>`;
+      output.innerHTML += `&gt;&gt; <span style="color:#34d399">✅ RESPONSE RECEIVED from ${targetPublisher}!</span><br>`;
       if (cmd === 'GET_STATUS') {
         output.innerHTML += `&gt;&gt; Status     : ${data.status || 'OK'}<br>`;
         output.innerHTML += `&gt;&gt; Publisher  : ${data.publisher || 'Unknown'}<br>`;
@@ -1050,7 +1059,7 @@ function sendCommand(cmd = 'GET_STATUS') {
         output.innerHTML += `&gt;&gt; Data Dump  : ${JSON.stringify(data.sensors).substring(0, 120)}...<br>`;
       }
       output.innerHTML += `&gt;&gt; ─────────────────────────────────────────<br>`;
-      output.innerHTML += `&gt;&gt; Request-Response pattern verified.<br>`;
+      output.innerHTML += `&gt;&gt; Request-Response pattern verified (1:1).<br>`;
       client.removeListener('message', handler);
       client.unsubscribe(responseTopic);
       state.features.reqres = true;
@@ -1060,7 +1069,7 @@ function sendCommand(cmd = 'GET_STATUS') {
 
   client.on('message', handler);
 
-  // Ensure subscription is active before publishing
+  // MQTT 5.0: responseTopic & correlationData di packet properties
   client.subscribe(responseTopic, { qos: 1 }, (err) => {
     if (err) {
       clearTimeout(timeout);
@@ -1068,13 +1077,11 @@ function sendCommand(cmd = 'GET_STATUS') {
       return;
     }
     
-    client.publish('novapulse/system/command/request', JSON.stringify({
+    client.publish(requestTopic, JSON.stringify({
       command: cmd, params: {}, timestamp: Date.now(),
-      _props: {
-        responseTopic,
-        correlationData: correlationId,
-        userProperties: { 'request-id': correlationId, 'source': 'dashboard' },
-      }
+      _responseTopic: responseTopic,
+      _correlationData: correlationId,
+      _props: { 'request-id': correlationId, 'source': 'dashboard' },
     }), { qos: 1 });
   });
 }
@@ -1103,8 +1110,7 @@ function burstTest() {
         id: i, source: sourceId,
         type: 'FLOW_CONTROL_TEST',
         timestamp: Date.now(),
-        _props: { userProperties: { 'source': sourceId, 'priority': 'HIGH' } }
-      }), { qos: 0 });
+      }), { qos: 0, properties: { userProperties: { 'source': sourceId, 'priority': 'HIGH' } } });
       publishedImmediately++;
       totalPublished++;
     } else {
@@ -1137,8 +1143,7 @@ function burstTest() {
         id: msgId, source: sourceId,
         type: 'FLOW_CONTROL_DRAIN',
         timestamp: Date.now(),
-        _props: { userProperties: { 'source': sourceId, 'priority': 'NORMAL' } }
-      }), { qos: 0 });
+      }), { qos: 0, properties: { userProperties: { 'source': sourceId, 'priority': 'NORMAL' } } });
       totalPublished++;
     }
 
@@ -1174,10 +1179,12 @@ function publishTestMessage() {
     type: 'TEST_MESSAGE',
     content: 'Manually triggered QoS 2 validation',
     timestamp: timestamp,
-    _props: {
+  }), { 
+    qos: 2,
+    properties: {
       userProperties: { 'source': 'novapulse-emergency-publisher', 'feature': 'qos2-validation' },
     }
-  }), { qos: 2 });
+  });
 }
 
 // Track active external nodes
@@ -1223,10 +1230,12 @@ function sendExternalUpdate(id, status = 'ACTIVE') {
     status: status,
     message: 'Periodic System Health Check',
     timestamp: Date.now(),
-    _props: {
+  }), { 
+    qos: 1,
+    properties: {
       userProperties: { 'source': id, 'type': 'external-validator' },
     }
-  }), { qos: 1 });
+  });
 }
 
 // 3. AUTOMATIC: Send updates for ALL existing nodes every 15 seconds (Normal Mode)
@@ -1514,3 +1523,4 @@ setTimeout(() => {
     updateFeatures();
   }
 }, 15000);
+

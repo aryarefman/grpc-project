@@ -1,176 +1,211 @@
-'use strict'
+import { test } from 'node:test'
+import EventEmitter, { once } from 'node:events'
+import { createServer } from 'node:net'
+import {
+  connect,
+  createAndConnect,
+  delay,
+  setup,
+  subscribe,
+  withTimeout
+} from './helper.js'
+import { Aedes } from '../aedes.js'
+import mqtt from 'mqtt'
 
-const { test } = require('tap')
-const EventEmitter = require('events')
-const { setup, connect, subscribe } = require('./helper')
-const aedes = require('../')
-
-test('aedes is closed before client authenticate returns', function (t) {
+test('aedes is closed before client authenticate returns', async (t) => {
   t.plan(1)
 
   const evt = new EventEmitter()
-  const broker = aedes({
+  const broker = await Aedes.createBroker({
     authenticate: (client, username, password, done) => {
       evt.emit('AuthenticateBegin', client)
-      setTimeout(function () {
+      setTimeout(() => {
         done(null, true)
-      }, 2000)
+      }, 20)
     }
   })
-
-  broker.on('client', function (client) {
-    t.fail('should no client registration')
+  broker.on('client', () => {
+    t.assert.fail('should no client registration')
   })
-  broker.on('connackSent', function () {
-    t.fail('should no connack be sent')
+  broker.on('connackSent', () => {
+    t.assert.fail('should no connack be sent')
   })
-  broker.on('clientError', function (client, err) {
-    t.error(err)
+  broker.on('clientError', () => {
+    t.assert.fail('should not error')
   })
 
-  connect(setup(broker))
+  const s = setup(broker)
 
-  evt.on('AuthenticateBegin', function (client) {
-    t.equal(broker.connectedClients, 0)
+  const waitForAuthEvent = async () => {
+    await once(evt, 'AuthenticateBegin')
+    t.assert.equal(broker.connectedClients, 0)
     broker.close()
-  })
+  }
+
+  // run parallel
+  await Promise.all([
+    waitForAuthEvent(),
+    withTimeout(connect(s), 0, 'connect timed out'), // connect will never finish
+  ])
 })
 
-test('client is closed before authenticate returns', function (t) {
+test('client is closed before authenticate returns', async (t) => {
   t.plan(1)
 
   const evt = new EventEmitter()
-  const broker = aedes({
-    authenticate: async (client, username, password, done) => {
+  const broker = await Aedes.createBroker({
+    authenticate: (client, username, password, done) => {
       evt.emit('AuthenticateBegin', client)
-      setTimeout(function () {
+      setTimeout(() => {
         done(null, true)
-      }, 2000)
+      }, 20)
     }
   })
-  t.teardown(broker.close.bind(broker))
 
-  broker.on('client', function (client) {
-    t.fail('should no client registration')
+  t.after(() => broker.close())
+
+  broker.on('client', () => {
+    t.assert.fail('should no client registration')
   })
-  broker.on('connackSent', function () {
-    t.fail('should no connack be sent')
+  broker.on('connackSent', () => {
+    t.assert.fail('should no connack be sent')
   })
-  broker.on('clientError', function (client, err) {
-    t.error(err)
+  broker.on('clientError', () => {
+    t.assert.fail('should not error')
   })
 
-  connect(setup(broker))
+  const s = setup(broker)
 
-  evt.on('AuthenticateBegin', function (client) {
-    t.equal(broker.connectedClients, 0)
+  const waitForAuthEvent = async () => {
+    const [client] = await once(evt, 'AuthenticateBegin')
+    t.assert.equal(broker.connectedClients, 0)
     client.close()
-  })
+  }
+
+  // run parallel
+  await Promise.all([
+    waitForAuthEvent(),
+    // connect will never finish, but the client close will produce a null in the generator
+    withTimeout(connect(s, { verifyIsConnack: false }), 10, 'connect timed out'),
+  ])
 })
 
-test('client is closed before authorizePublish returns', function (t) {
-  t.plan(3)
+test('client is closed before authorizePublish returns', async (t) => {
+  t.plan(4)
 
   const evt = new EventEmitter()
-  const broker = aedes({
+  const broker = await Aedes.createBroker({
     authorizePublish: (client, packet, done) => {
       evt.emit('AuthorizePublishBegin', client)
       // simulate latency writing to persistent store.
-      setTimeout(function () {
+      setTimeout(() => {
         done()
         evt.emit('AuthorizePublishEnd', client)
-      }, 2000)
+      }, 50)
     }
   })
+  t.after(() => broker.close())
 
-  broker.on('clientError', function (client, err) {
-    t.equal(err.message, 'connection closed')
-  })
+  const s = setup(broker)
+  await connect(s)
 
-  const s = connect(setup(broker))
-  s.inStream.write({
-    cmd: 'publish',
-    topic: 'hello',
-    payload: 'world',
-    qos: 1,
-    messageId: 10,
-    retain: false
-  })
+  const connectionClosed = async () => {
+    const [client, err] = await once(broker, 'clientError')
+    t.assert.ok(client, 'client exists')
+    t.assert.equal(err.message, 'connection closed', 'connection is closed')
+  }
 
-  evt.on('AuthorizePublishBegin', function (client) {
-    t.equal(broker.connectedClients, 1)
+  const publishBegin = async () => {
+    const [client] = await once(evt, 'AuthorizePublishBegin')
+    t.assert.equal(broker.connectedClients, 1, '1 client connected')
+    await delay(0) // give the eventloop some time
     client.close()
-  })
-  evt.on('AuthorizePublishEnd', function (client) {
-    t.equal(broker.connectedClients, 0)
-    broker.close()
-  })
+  }
+
+  const publishEnd = async () => {
+    await once(evt, 'AuthorizePublishEnd')
+    t.assert.equal(broker.connectedClients, 0, 'no client connected')
+  }
+
+  const publish = () => {
+    s.inStream.write({
+      cmd: 'publish',
+      topic: 'hello',
+      payload: 'world',
+      qos: 1,
+      messageId: 10,
+      retain: false
+    })
+  }
+  // run parallel
+  await Promise.all([
+    connectionClosed(),
+    publishBegin(),
+    publishEnd(),
+    publish()
+  ])
 })
 
-test('close client when its socket is closed', function (t) {
+test('close client when its socket is closed', async (t) => {
   t.plan(4)
 
-  const broker = aedes()
-  t.teardown(broker.close.bind(broker))
-
-  const subscriber = connect(setup(broker))
-
-  subscribe(t, subscriber, 'hello', 1, function () {
-    subscriber.inStream.end()
-    subscriber.conn.on('close', function () {
-      t.equal(broker.connectedClients, 0, 'no connected client')
-    })
-  })
+  const s = await createAndConnect(t)
+  await subscribe(t, s, 'hello', 1)
+  s.inStream.end()
+  await once(s.client.conn, 'close')
+  await delay(10)
+  t.assert.equal(s.broker.connectedClients, 0, 'no connected client')
 })
 
-test('multiple clients subscribe same topic, and all clients still receive message except the closed one', function (t) {
+test('multiple clients subscribe same topic, and all clients still receive message except the closed one', async (t) => {
   t.plan(5)
 
-  const mqtt = require('mqtt')
-  const broker = aedes()
-
+  const broker = await Aedes.createBroker()
   let client2
 
-  t.teardown(() => {
+  t.after(() => {
     client2.end()
     broker.close()
     server.close()
   })
 
-  const server = require('net').createServer(broker.handle)
+  const server = createServer(broker.handle)
   const port = 1883
   server.listen(port)
-  broker.on('clientError', function (client, err) {
-    t.error(err)
+  broker.on('clientError', () => {
+    t.assert.fail('should not get clientError event')
   })
 
-  const _sameTopic = 'hello'
+  const sameTopic = 'hello'
 
   // client 1
   const client1 = mqtt.connect('mqtt://localhost', { clientId: 'client1', resubscribe: false, reconnectPeriod: -1 })
   client1.on('message', () => {
-    t.fail('client1 receives message')
+    t.assert.fail('client1 receives message')
   })
 
-  client1.subscribe(_sameTopic, { qos: 0, retain: false }, () => {
-    t.pass('client1 sub callback')
-    // stimulate closed socket by users
-    client1.stream.destroy()
+  await new Promise(resolve => {
+    client1.subscribe(sameTopic, { qos: 0, retain: false }, () => {
+      t.assert.ok(true, 'client1 sub callback')
+      // stimulate closed socket by users
+      client1.stream.destroy()
 
-    // client 2
-    client2 = mqtt.connect('mqtt://localhost', { clientId: 'client2', resubscribe: false })
-    client2.on('message', () => {
-      t.pass('client2 receives message')
-      t.equal(broker.connectedClients, 1)
-    })
-    client2.subscribe(_sameTopic, { qos: 0, retain: false }, () => {
-      t.pass('client2 sub callback')
+      // client 2
+      client2 = mqtt.connect('mqtt://localhost', { clientId: 'client2', resubscribe: false })
+      client2.on('message', () => {
+        t.assert.ok(true, 'client2 receives message')
+        t.assert.equal(broker.connectedClients, 1)
+        resolve()
+      })
+      client2.subscribe(sameTopic, { qos: 0, retain: false }, () => {
+        t.assert.ok(true, 'client2 sub callback')
 
-      // pubClient
-      const pubClient = mqtt.connect('mqtt://localhost', { clientId: 'pubClient' })
-      pubClient.publish(_sameTopic, 'world', { qos: 0, retain: false }, () => {
-        t.pass('pubClient publish event')
-        pubClient.end()
+        // pubClient
+        const pubClient = mqtt.connect('mqtt://localhost', { clientId: 'pubClient' })
+        pubClient.publish(sameTopic, 'world', { qos: 0, retain: false }, () => {
+          t.assert.ok(true, 'pubClient publish event')
+          pubClient.end()
+        })
       })
     })
   })

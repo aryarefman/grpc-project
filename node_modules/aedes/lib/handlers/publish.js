@@ -1,15 +1,17 @@
-'use strict'
+import write from '../write.js'
 
-const write = require('../write')
-
-function PubAck (packet) {
-  this.cmd = 'puback'
-  this.messageId = packet.messageId
+class PubAck {
+  constructor (packet) {
+    this.cmd = 'puback'
+    this.messageId = packet.messageId
+  }
 }
 
-function PubRec (packet) {
-  this.cmd = 'pubrec'
-  this.messageId = packet.messageId
+class PubRec {
+  constructor (packet) {
+    this.cmd = 'pubrec'
+    this.messageId = packet.messageId
+  }
 }
 
 const publishActions = [
@@ -39,10 +41,23 @@ function enqueuePublish (packet, done) {
 
   switch (packet.qos) {
     case 2:
-      client.broker.persistence.incomingStorePacket(client, packet, function (err) {
-        if (err) { return done(err) }
-        write(client, new PubRec(packet), done)
-      })
+      // MQTT-4.3.3-2: Check if we already have this packet by messageId
+      client.broker.persistence.incomingGetPacket(client, packet)
+        .then(() => {
+          // Duplicate packet: just send PUBREC, don't publish again
+          write(client, new PubRec(packet), done)
+        }, () => {
+          // New packet (not found in store): store first, then publish
+          // This ensures if storage fails, message hasn't been delivered yet
+          // preventing duplicate delivery on retransmission
+          client.broker.persistence.incomingStorePacket(client, packet)
+            .then(() => {
+              client.broker.publish(packet, client, (err) => {
+                if (err) { return done(err) }
+                write(client, new PubRec(packet), done)
+              })
+            }, done)
+        })
       break
     case 1:
       write(client, new PubAck(packet), function (err) {
@@ -62,4 +77,4 @@ function authorizePublish (packet, done) {
   this.broker.authorizePublish(this, packet, done)
 }
 
-module.exports = handlePublish
+export default handlePublish

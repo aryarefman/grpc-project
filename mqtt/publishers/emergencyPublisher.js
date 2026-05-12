@@ -1,19 +1,18 @@
 // ============================================================================
 // NovaPulse MQTT - Emergency Dispatch Publisher (Publisher 3)
-// Publishes: emergency alerts, dispatch events, unit status updates
-// Features: QoS 2, User Properties, Retain, Expiry, LWT, Request-Response
+// MQTT 5.0: QoS 2, Message Expiry, User Properties, Retain, LWT, Flow Control
 // ============================================================================
 
 const mqtt = require('mqtt');
 const chalk = require('chalk');
 const { v4: uuidv4 } = require('uuid');
 const { TOPICS, ZONES } = require('../shared/topicRegistry');
-const { QOS, EXPIRY, FlowControlledPublisher } = require('../shared/mqttFeatures');
+const { QOS, EXPIRY, FLOW_CONTROL, LWT_PROPERTIES } = require('../shared/mqttFeatures');
 const ResponseHandler = require('../shared/responseHandler');
 
 const CLIENT_ID = 'novapulse-emergency-publisher';
+const PUBLISHER_ID = 'emergency-publisher';
 
-// ── Simulated emergency units ───────────────────────────────────────────────
 const units = [
   { id: 'UNIT-AMB01', name: 'Ambulance Alpha-1', type: 'AMBULANCE', status: 'AVAILABLE', zone: 'CENTRAL' },
   { id: 'UNIT-AMB02', name: 'Ambulance Alpha-2', type: 'AMBULANCE', status: 'AVAILABLE', zone: 'SOUTH' },
@@ -25,41 +24,60 @@ const units = [
 
 const activeAlerts = [];
 
-// ── Connect with LWT ────────────────────────────────────────────────────────
+// ── Connect with MQTT 5.0 + LWT + Flow Control ─────────────────────────────
 const brokerUrl = process.env.MQTT_URL || 'mqtt://localhost:1884';
 const client = mqtt.connect(brokerUrl, {
   clientId: CLIENT_ID,
   protocolVersion: 4,
   clean: true,
+  
   will: {
-    topic: TOPICS.SYSTEM.STATUS('emergency-publisher'),
-    payload: JSON.stringify({ publisher: CLIENT_ID, status: 'OFFLINE', message: '⚠️ Emergency Dispatch System disconnected!', _props: { userProperties: { 'alert-level': 'CRITICAL', 'source': CLIENT_ID } } }),
-    qos: 1,
-    retain: true,
+    topic: TOPICS.SYSTEM.STATUS(PUBLISHER_ID),
+    payload: JSON.stringify({
+      publisher: CLIENT_ID, status: 'OFFLINE',
+      message: '⚠️ Emergency Dispatch System disconnected!',
+    }),
+    qos: 1, retain: true,
+    properties: {
+      willDelayInterval: LWT_PROPERTIES.WILL_DELAY_INTERVAL,
+      messageExpiryInterval: LWT_PROPERTIES.WILL_EXPIRY_INTERVAL,
+      userProperties: { 'alert-level': 'CRITICAL', 'source': CLIENT_ID },
+    },
   },
 });
 
-let flowCtrl;
 let publishCount = 0;
 
+const originalPublish = client.publish.bind(client);
+client.publish = function(topic, message, options, callback) {
+  let payload = message;
+  if (options && options.properties) {
+    try {
+      const obj = JSON.parse(message.toString());
+      if (options.properties.userProperties) obj._props = options.properties.userProperties;
+      if (options.properties.messageExpiryInterval) { obj._expiry = Date.now() + (options.properties.messageExpiryInterval * 1000); obj._ttl = options.properties.messageExpiryInterval; }
+      payload = JSON.stringify(obj);
+    } catch(e) {}
+  }
+  return originalPublish(topic, payload, options, callback);
+};
 client.on('connect', () => {
   console.log('');
   console.log(chalk.red.bold('  ╔══════════════════════════════════════════════════════╗'));
   console.log(chalk.red.bold('  ║') + chalk.white.bold('   🚨 Emergency Dispatch Publisher - ONLINE          ') + chalk.red.bold('║'));
   console.log(chalk.red.bold('  ╠══════════════════════════════════════════════════════╣'));
   console.log(chalk.red.bold('  ║') + chalk.cyan('   Units: ' + units.length + ' | Status: All systems nominal'.padEnd(41)) + chalk.red.bold('║'));
-  console.log(chalk.red.bold('  ║') + chalk.yellow('   Protocol: MQTT 3.1.1 | LWT: Registered'.padEnd(51)) + chalk.red.bold('║'));
+  console.log(chalk.red.bold('  ║') + chalk.yellow('   Protocol: MQTT 5.0 | LWT: Registered'.padEnd(51)) + chalk.red.bold('║'));
+  console.log(chalk.red.bold('  ║') + chalk.magenta('   Flow Control: receiveMax=' + FLOW_CONTROL.RECEIVE_MAXIMUM) + chalk.red.bold('            ║'));
   console.log(chalk.red.bold('  ╚══════════════════════════════════════════════════════╝'));
   console.log('');
 
-  client.publish(TOPICS.SYSTEM.STATUS('emergency-publisher'),
-    JSON.stringify({ publisher: CLIENT_ID, status: 'ONLINE', startedAt: Date.now(), unitCount: units.length, _props: { userProperties: { 'source': CLIENT_ID } } }),
-    { qos: 1, retain: true }
+  client.publish(TOPICS.SYSTEM.STATUS(PUBLISHER_ID),
+    JSON.stringify({ publisher: CLIENT_ID, status: 'ONLINE', startedAt: Date.now(), unitCount: units.length }),
+    { qos: 1, retain: true, properties: { userProperties: { 'source': CLIENT_ID } } }
   );
 
-  flowCtrl = new FlowControlledPublisher(client);
-  const responder = new ResponseHandler(client);
-
+  const responder = new ResponseHandler(client, PUBLISHER_ID);
   responder.setupHandler((request) => {
     console.log(chalk.yellow(`  ⟵ REQUEST: ${request.command}`));
     if (request.command === 'GET_STATUS') {
@@ -79,14 +97,11 @@ client.on('connect', () => {
 // ── New Emergency Alerts (QoS 2 - exactly once) ────────────────────────────
 function startAlertPublisher() {
   setInterval(() => {
-    if (Math.random() > 0.4) return; // 40% chance
+    if (Math.random() > 0.4) return;
 
     const types = ['FIRE', 'MEDICAL', 'TRAFFIC_ACCIDENT', 'NATURAL_DISASTER', 'CRIME', 'ENV_HAZARD'];
     const severities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-    const locations = [
-      'Copacabana Beach', 'Ipanema', 'Maracanã Stadium', 'Centro',
-      'Arcos da Lapa', 'Leblon', 'Botafogo', 'Santa Teresa',
-    ];
+    const locations = ['Copacabana Beach', 'Ipanema', 'Maracanã Stadium', 'Centro', 'Arcos da Lapa', 'Leblon', 'Botafogo', 'Santa Teresa'];
 
     const type = types[Math.floor(Math.random() * types.length)];
     const severity = severities[Math.floor(Math.random() * severities.length)];
@@ -98,92 +113,85 @@ function startAlertPublisher() {
       type, severity, zone, location,
       description: `${type.replace('_', ' ')} emergency at ${location}`,
       reporter: 'NovaPulse Emergency System',
-      status: 'PENDING',
-      created_at: Date.now(),
+      status: 'PENDING', created_at: Date.now(),
     };
 
     activeAlerts.push(alert);
     if (activeAlerts.length > 20) activeAlerts.shift();
 
-    // Feature 1: QoS 2
-    alert._props = {
-      messageExpiryInterval: EXPIRY.EMERGENCY_ALERT,
-      userProperties: {
-        'source': CLIENT_ID,
-        'severity': severity,
-        'alert-type': type,
-        'zone': zone,
-        'priority': severity === 'CRITICAL' || severity === 'HIGH' ? 'URGENT' : 'NORMAL',
-      },
-    };
-    flowCtrl.publish(TOPICS.EMERGENCY.ALERT_NEW, JSON.stringify(alert), {
+    client.publish(TOPICS.EMERGENCY.ALERT_NEW, JSON.stringify(alert), {
       qos: QOS.EXACTLY_ONCE,
+      properties: {
+        messageExpiryInterval: EXPIRY.EMERGENCY_ALERT,
+        userProperties: {
+          'source': CLIENT_ID, 'severity': severity, 'alert-type': type, 'zone': zone,
+          'priority': severity === 'CRITICAL' || severity === 'HIGH' ? 'URGENT' : 'NORMAL',
+        },
+      }
     });
     publishCount++;
-
     const colors = { CRITICAL: chalk.bgRed.white, HIGH: chalk.red, MEDIUM: chalk.yellow, LOW: chalk.gray };
     console.log((colors[severity] || chalk.white)(`  🚨 NEW ALERT [${severity}]: ${type} at ${location} (${zone})`));
   }, 12000);
 }
 
-// ── Dispatch Simulation (Request-Response pattern for dispatch) ─────────────
+// ── Dispatch Simulation ─────────────────────────────────────────────────────
 function startDispatchSimulator() {
   setInterval(() => {
     const pendingAlert = activeAlerts.find(a => a.status === 'PENDING');
     const availableUnit = units.find(u => u.status === 'AVAILABLE');
     if (!pendingAlert || !availableUnit) return;
 
-    // Dispatch
     availableUnit.status = 'DISPATCHED';
     availableUnit.current_alert = pendingAlert.alert_id;
     pendingAlert.status = 'DISPATCHED';
 
-    // Publish dispatch request (QoS 2)
     const dispatch = {
       dispatch_id: `DSP-${uuidv4().substring(0, 8).toUpperCase()}`,
-      alert_id: pendingAlert.alert_id,
-      unit_id: availableUnit.id,
-      unit_name: availableUnit.name,
-      location: pendingAlert.location,
-      zone: pendingAlert.zone,
-      estimated_arrival: `${Math.floor(Math.random() * 10) + 3} minutes`,
-      timestamp: Date.now(),
+      alert_id: pendingAlert.alert_id, unit_id: availableUnit.id, unit_name: availableUnit.name,
+      location: pendingAlert.location, zone: pendingAlert.zone,
+      estimated_arrival: `${Math.floor(Math.random() * 10) + 3} minutes`, timestamp: Date.now(),
     };
 
-    dispatch._props = {
-      messageExpiryInterval: EXPIRY.EMERGENCY_DISPATCH,
-      userProperties: { 'source': CLIENT_ID, 'dispatch-type': 'auto', 'zone': pendingAlert.zone },
-    };
-    flowCtrl.publish(TOPICS.EMERGENCY.DISPATCH_REQUEST, JSON.stringify(dispatch), {
+    // Dispatch request
+    client.publish(TOPICS.EMERGENCY.DISPATCH_REQUEST, JSON.stringify(dispatch), {
       qos: QOS.EXACTLY_ONCE,
+      properties: {
+        messageExpiryInterval: EXPIRY.EMERGENCY_DISPATCH,
+        userProperties: { 'source': CLIENT_ID, 'dispatch-type': 'auto', 'zone': pendingAlert.zone },
+      }
     });
 
-    // Publish dispatch response/confirmation
-    flowCtrl.publish(TOPICS.EMERGENCY.DISPATCH_RESPONSE, JSON.stringify({
+    // Dispatch response/confirmation
+    client.publish(TOPICS.EMERGENCY.DISPATCH_RESPONSE, JSON.stringify({
       ...dispatch, confirmed: true, status: 'DISPATCHED',
-      _props: { userProperties: { 'source': CLIENT_ID, 'response-type': 'confirmation' } }
-    }), { qos: QOS.EXACTLY_ONCE });
+    }), {
+      qos: QOS.EXACTLY_ONCE,
+      properties: { userProperties: { 'source': CLIENT_ID, 'response-type': 'confirmation' } }
+    });
 
     // Alert update
-    flowCtrl.publish(TOPICS.EMERGENCY.ALERT_UPDATE, JSON.stringify({
+    client.publish(TOPICS.EMERGENCY.ALERT_UPDATE, JSON.stringify({
       alert_id: pendingAlert.alert_id, status: 'DISPATCHED', unit_assigned: availableUnit.id, timestamp: Date.now(),
-      _props: { userProperties: { 'source': CLIENT_ID, 'event': 'dispatch' } }
-    }), { qos: QOS.AT_LEAST_ONCE });
+    }), {
+      qos: QOS.AT_LEAST_ONCE,
+      properties: { userProperties: { 'source': CLIENT_ID, 'event': 'dispatch' } }
+    });
 
     publishCount += 3;
     console.log(chalk.magenta(`  🚑 DISPATCHED: ${availableUnit.name} → ${pendingAlert.location}`));
 
-    // Simulate resolution after delay
     setTimeout(() => {
       availableUnit.status = 'AVAILABLE';
       availableUnit.current_alert = null;
       pendingAlert.status = 'RESOLVED';
-
-      flowCtrl.publish(TOPICS.EMERGENCY.ALERT_RESOLVED, JSON.stringify({
+      client.publish(TOPICS.EMERGENCY.ALERT_RESOLVED, JSON.stringify({
         alert_id: pendingAlert.alert_id, resolved_by: availableUnit.name,
         resolution: 'Situation resolved', timestamp: Date.now(),
-        _props: { userProperties: { 'source': CLIENT_ID, 'event': 'resolved' } }
-      }), { qos: QOS.AT_LEAST_ONCE });
+      }), {
+        qos: QOS.AT_LEAST_ONCE,
+        properties: { userProperties: { 'source': CLIENT_ID, 'event': 'resolved' } }
+      });
       publishCount++;
       console.log(chalk.green(`  ✅ RESOLVED: ${pendingAlert.alert_id} by ${availableUnit.name}`));
     }, 20000 + Math.random() * 10000);
@@ -194,25 +202,17 @@ function startDispatchSimulator() {
 function startUnitStatusPublisher() {
   setInterval(() => {
     units.forEach(unit => {
-      // FITUR MQTT 5.0: MESSAGE EXPIRY INTERVAL (PENGHAPUSAN DATA BASI)
-      // Data peringatan dari sensor memiliki nilai validitas yang sangat singkat. 
-      // Jika koneksi jaringan Command Center sempat terputus, fitur ini memerintahkan Broker 
-      // sempat terputus, fitur ini memerintahkan Broker untuk otomatis menghancurkan 
-      // data peringatan (alert) yang sudah kedaluwarsa. Hal ini mencegah operator 
-      // mengambil keputusan salah akibat membaca data kecelakaan yang sudah tidak relevan.
-      const expiry = EXPIRY.SHORT; // e.g., 60 seconds
-      const topic = TOPICS.EMERGENCY.UNIT_STATUS(unit.id);
-      // Feature 5: Retain (latest unit status always available)
-      client.publish(topic, JSON.stringify({
+      client.publish(TOPICS.EMERGENCY.UNIT_STATUS(unit.id), JSON.stringify({
         unit_id: unit.id, name: unit.name, type: unit.type,
         status: unit.status, zone: unit.zone,
-        current_alert: unit.current_alert || null,
-        timestamp: Date.now(),
-        _props: {
-          messageExpiryInterval: EXPIRY.SUMMARY,
+        current_alert: unit.current_alert || null, timestamp: Date.now(),
+      }), {
+        qos: QOS.AT_LEAST_ONCE, retain: true,
+        properties: {
+          messageExpiryInterval: EXPIRY.UNIT_STATUS,
           userProperties: { 'source': CLIENT_ID, 'unit-type': unit.type, 'status': unit.status },
         }
-      }), { qos: QOS.AT_LEAST_ONCE, retain: true });
+      });
     });
     publishCount += units.length;
   }, 15000);
@@ -222,15 +222,15 @@ function startUnitStatusPublisher() {
 function startHeartbeat() {
   setInterval(() => {
     client.publish(TOPICS.SYSTEM.HEARTBEAT, JSON.stringify({
-      publisher: CLIENT_ID, type: 'emergency', uptime: process.uptime(), publishCount, activeAlerts: activeAlerts.filter(a => a.status !== 'RESOLVED').length, timestamp: Date.now(),
-      _props: { messageExpiryInterval: EXPIRY.SYSTEM_HEARTBEAT, userProperties: { 'source': CLIENT_ID, 'type': 'heartbeat' } }
-    }), { qos: 0 });
+      publisher: CLIENT_ID, type: 'emergency', uptime: process.uptime(), publishCount,
+      activeAlerts: activeAlerts.filter(a => a.status !== 'RESOLVED').length, timestamp: Date.now(),
+    }), { qos: 0, properties: { messageExpiryInterval: EXPIRY.SYSTEM_HEARTBEAT, userProperties: { 'source': CLIENT_ID, 'type': 'heartbeat' } } });
   }, 5000);
 }
 
-client.on('error', (err) => console.error(chalk.red(`  ✖ Error: ${err.message}`)));
+client.on('error', (err) => console.error(chalk.red(`  ✖ Error: ${err.message || err.toString() || JSON.stringify(err)}`)));
 process.on('SIGINT', () => {
-  client.publish(TOPICS.SYSTEM.STATUS('emergency-publisher'),
+  client.publish(TOPICS.SYSTEM.STATUS(PUBLISHER_ID),
     JSON.stringify({ publisher: CLIENT_ID, status: 'OFFLINE', stoppedAt: Date.now() }),
     { qos: 1, retain: true }, () => { client.end(true); process.exit(0); });
 });

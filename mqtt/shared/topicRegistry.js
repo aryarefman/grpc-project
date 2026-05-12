@@ -31,6 +31,7 @@ const TOPICS = {
     HEARTBEAT: 'novapulse/system/heartbeat',
     STATUS: (component) => `novapulse/system/status/${component}`,
     COMMAND_REQUEST: 'novapulse/system/command/request',
+    COMMAND_REQUEST_TO: (publisherId) => `novapulse/system/command/request/${publisherId}`,
     COMMAND_RESPONSE: (correlationId) => `novapulse/system/command/response/${correlationId}`,
   },
 };

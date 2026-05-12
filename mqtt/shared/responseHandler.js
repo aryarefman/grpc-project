@@ -1,28 +1,35 @@
 // ============================================================================
-// NovaPulse MQTT - Response Handler (Simulation on MQTT 3.1.1)
-// Simulates MQTT 5.0 Request-Response using application-level _props
+// NovaPulse MQTT - Response Handler (MQTT 5.0)
+// Publisher-side: listens for requests on per-publisher topic, sends response
+// Uses MQTT 5.0 properties: responseTopic, correlationData, userProperties
 // ============================================================================
 
+const chalk = require('chalk');
 const { TOPICS } = require('./topicRegistry');
 
 class ResponseHandler {
-  constructor(mqttClient) {
+  constructor(mqttClient, publisherId) {
     this.client = mqttClient;
+    this.publisherId = publisherId;
   }
 
-  // ── Register as a responder ───────────────────────────────────────────────
+  // ── Register as a responder (per-publisher topic) ─────────────────────────
   setupHandler(callback) {
-    this.client.subscribe(TOPICS.SYSTEM.COMMAND_REQUEST, { qos: 1 });
+    // FIX Masalah 3: Subscribe ke topic SPESIFIK per publisher
+    // Sebelumnya semua publisher subscribe ke 1 generic topic → 3 responses
+    // Sekarang masing-masing publisher punya topic sendiri → 1 response
+    const requestTopic = TOPICS.SYSTEM.COMMAND_REQUEST_TO(this.publisherId);
+    this.client.subscribe(requestTopic, { qos: 1 });
 
-    this.client.on('message', async (topic, payload) => {
-      if (topic !== TOPICS.SYSTEM.COMMAND_REQUEST) return;
+    this.client.on('message', async (topic, payload, packet) => {
+      if (topic !== requestTopic) return;
 
       let request;
       try { request = JSON.parse(payload.toString()); } catch { return; }
 
-      // Read simulated MQTT 5.0 properties from JSON payload
-      const responseTopic = request._props?.responseTopic;
-      const correlationData = request._props?.correlationData;
+      // Fallback to simulated MQTT 5.0 properties from JSON body for v4 compatibility
+      const responseTopic = request._responseTopic || packet.properties?.responseTopic;
+      const correlationData = request._correlationData || packet.properties?.correlationData;
 
       if (!responseTopic || !correlationData) return;
 
@@ -36,26 +43,22 @@ class ResponseHandler {
         
         if (responseData.error) {
           console.log(chalk.red(`  (RR) Command returned error: ${responseData.error}`));
-          // We still send the error back so the dashboard knows what happened
         }
 
-        
-        // Send the response exactly to the requested private channel
+        // Send response with simulated correlation data
         this.client.publish(responseTopic, JSON.stringify({
           ...responseData,
           timestamp: Date.now(),
+          _correlationData: correlationData,
           _props: {
-            correlationData: correlationData,
-            userProperties: {
-              'response-to': correlationData,
-              'source': this.client.options?.clientId || 'publisher',
-            }
+            'response-to': correlationData.toString(),
+            'source': this.publisherId,
           }
         }), { qos: 1 });
       } catch (err) {
         this.client.publish(responseTopic, JSON.stringify({
           error: err.message || 'Internal Error',
-          _props: { correlationData }
+          _correlationData: correlationData,
         }), { qos: 1 });
       }
     });

@@ -1,25 +1,22 @@
-'use strict'
+import Packet from 'aedes-packet'
 
-const Packet = require('aedes-packet')
-const util = require('util')
+class QoSPacket extends Packet {
+  constructor (original, client) {
+    super(original, client.broker)
 
-function QoSPacket (original, client) {
-  Packet.call(this, original, client.broker)
+    this.writeCallback = client._onError.bind(client)
 
-  this.writeCallback = client._onError.bind(client)
-
-  if (!original.messageId) {
-    this.messageId = client._nextId
-    if (client._nextId >= 65535) {
-      client._nextId = 1
+    if (!original.messageId) {
+      this.messageId = client._nextId
+      if (client._nextId >= 65535) {
+        client._nextId = 1
+      } else {
+        client._nextId++
+      }
     } else {
-      client._nextId++
+      this.messageId = original.messageId
     }
-  } else {
-    this.messageId = original.messageId
   }
 }
 
-util.inherits(QoSPacket, Packet)
-
-module.exports = QoSPacket
+export default QoSPacket

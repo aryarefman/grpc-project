@@ -1,10 +1,10 @@
-'use strict'
+import write from '../write.js'
 
-const write = require('../write')
-
-function PubRel (packet) {
-  this.cmd = 'pubrel'
-  this.messageId = packet.messageId
+class PubRel {
+  constructor (packet) {
+    this.cmd = 'pubrel'
+    this.messageId = packet.messageId
+  }
 }
 
 function handlePubrec (client, packet, done) {
@@ -15,16 +15,8 @@ function handlePubrec (client, packet, done) {
     return
   }
 
-  client.broker.persistence.outgoingUpdate(
-    client, pubrel, reply)
-
-  function reply (err) {
-    if (err) {
-      done(err)
-    } else {
-      write(client, pubrel, done)
-    }
-  }
+  client.broker.persistence.outgoingUpdate(client, pubrel)
+    .then(() => write(client, pubrel, done), done)
 }
 
-module.exports = handlePubrec
+export default handlePubrec

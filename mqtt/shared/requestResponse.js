@@ -1,6 +1,7 @@
 // ============================================================================
 // NovaPulse MQTT - Request/Response Handler (MQTT 5.0)
-// Uses responseTopic + correlationData for request-response pattern
+// Combined handler: uses MQTT 5.0 responseTopic + correlationData properties
+// Per-publisher routing for 1:1 request-response
 // ============================================================================
 
 const { v4: uuidv4 } = require('uuid');
@@ -12,8 +13,8 @@ class RequestResponseHandler {
     this.pendingRequests = new Map();
   }
 
-  // ── Send a request and wait for response ──────────────────────────────
-  async sendRequest(command, params = {}, timeoutMs = 5000) {
+  // ── Send a targeted request to a specific publisher ───────────────────
+  async sendRequest(targetPublisherId, command, params = {}, timeoutMs = 5000) {
     const correlationId = uuidv4();
     const responseTopic = TOPICS.SYSTEM.COMMAND_RESPONSE(correlationId);
 
@@ -28,20 +29,19 @@ class RequestResponseHandler {
 
       // Subscribe to response topic first
       this.client.subscribe(responseTopic, { qos: 1 }, () => {
-        // Then publish the request
+        // Publish to target publisher's specific request topic
         this.client.publish(
-          TOPICS.SYSTEM.COMMAND_REQUEST,
+          TOPICS.SYSTEM.COMMAND_REQUEST_TO(targetPublisherId),
           JSON.stringify({ 
             command, 
             params, 
             timestamp: Date.now(),
+            _responseTopic: responseTopic,
+            _correlationData: correlationId,
             _props: {
-              responseTopic: responseTopic,
-              correlationData: correlationId,
-              userProperties: {
-                'request-id': correlationId,
-                'source': 'command-center',
-              }
+              'request-id': correlationId,
+              'source': 'command-center',
+              'target': targetPublisherId,
             }
           }),
           { qos: 1 }
@@ -56,7 +56,7 @@ class RequestResponseHandler {
     let data;
     try { data = JSON.parse(payload.toString()); } catch { return false; }
     
-    const correlationData = data._props?.correlationData;
+    const correlationData = data._correlationData || packet.properties?.correlationData;
     if (!correlationData) return false;
 
     const correlationId = correlationData.toString();
@@ -67,42 +67,36 @@ class RequestResponseHandler {
     this.pendingRequests.delete(correlationId);
     this.client.unsubscribe(topic);
 
-    try {
-      pending.resolve(JSON.parse(payload.toString()));
-    } catch {
-      pending.resolve(payload.toString());
-    }
+    pending.resolve(data);
     return true;
   }
 
   // ── Register as a request handler (publisher side) ────────────────────
-  setupRequestHandler(callback) {
-    this.client.subscribe(TOPICS.SYSTEM.COMMAND_REQUEST, { qos: 1 });
+  setupRequestHandler(publisherId, callback) {
+    const requestTopic = TOPICS.SYSTEM.COMMAND_REQUEST_TO(publisherId);
+    this.client.subscribe(requestTopic, { qos: 1 });
+
     this.client.on('message', (topic, payload, packet) => {
-      if (topic !== TOPICS.SYSTEM.COMMAND_REQUEST) return;
+      if (topic !== requestTopic) return;
 
       let request;
       try { request = JSON.parse(payload.toString()); } catch { return; }
 
-      const responseTopic = request._props?.responseTopic;
-      const correlationData = request._props?.correlationData;
+      const responseTopic = request._responseTopic || packet.properties?.responseTopic;
+      const correlationData = request._correlationData || packet.properties?.correlationData;
       if (!responseTopic || !correlationData) return;
 
       const response = callback(request);
       
-      // Embed properties in response
-      const responsePayload = {
+      this.client.publish(responseTopic, JSON.stringify({
         ...response,
+        timestamp: Date.now(),
+        _correlationData: correlationData,
         _props: {
-          correlationData,
-          userProperties: {
-            'response-to': correlationData,
-            'source': this.client.options?.clientId || 'unknown',
-          }
+          'response-to': correlationData.toString(),
+          'source': publisherId,
         }
-      };
-
-      this.client.publish(responseTopic, JSON.stringify(responsePayload), { qos: 1 });
+      }), { qos: 1 });
     });
   }
 }

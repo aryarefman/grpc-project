@@ -1,22 +1,23 @@
-'use strict'
+import write from '../write.js'
 
-const write = require('../write')
-
-function ClientPacketStatus (client, packet) {
-  this.client = client
-  this.packet = packet
+class ClientPacketStatus {
+  constructor (client, packet) {
+    this.client = client
+    this.packet = packet
+  }
 }
 
-function PubComp (packet) {
-  this.cmd = 'pubcomp'
-  this.messageId = packet.messageId
+class PubComp {
+  constructor (packet) {
+    this.cmd = 'pubcomp'
+    this.messageId = packet.messageId
+  }
 }
 
 const pubrelActions = [
   pubrelGet,
-  pubrelPublish,
-  pubrelWrite,
-  pubrelDel
+  pubrelDelete,
+  pubrelWrite
 ]
 function handlePubrel (client, packet, done) {
   client.broker._series(
@@ -25,26 +26,34 @@ function handlePubrel (client, packet, done) {
 }
 
 function pubrelGet (arg, done) {
+  // MQTT-4.3.3-2: Check if we have this packet in persistence
   const persistence = this.client.broker.persistence
-  persistence.incomingGetPacket(this.client, this.packet, reply)
-
-  function reply (err, packet) {
-    arg.packet = packet
-    done(err)
-  }
+  persistence.incomingGetPacket(this.client, this.packet)
+    .then((packet) => {
+      arg.packet = this.packet
+      arg.foundInStore = !!packet
+      done(null, arg)
+    }, () => {
+      // Even if incomingGetPacket fails, continue to send PUBCOMP
+      arg.packet = this.packet
+      arg.foundInStore = false
+      done(null, arg)
+    })
 }
 
-function pubrelPublish (arg, done) {
-  this.client.broker.publish(arg.packet, this.client, done)
+function pubrelDelete (arg, done) {
+  // Only delete if we found the packet in the store
+  if (!arg.foundInStore) {
+    return done(null, arg)
+  }
+
+  const persistence = this.client.broker.persistence
+  persistence.incomingDelPacket(this.client, arg.packet).finally(() => done(null, arg))
 }
 
 function pubrelWrite (arg, done) {
+  // Always send PUBCOMP, even if packet was not found in store
   write(this.client, new PubComp(arg.packet), done)
 }
 
-function pubrelDel (arg, done) {
-  const persistence = this.client.broker.persistence
-  persistence.incomingDelPacket(this.client, arg.packet, done)
-}
-
-module.exports = handlePubrel
+export default handlePubrel

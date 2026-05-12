@@ -3,7 +3,6 @@
 // In-process MQTT broker with TCP (1883) + WebSocket (9001) transport
 // ============================================================================
 
-const aedes = require('aedes')();
 const net = require('net');
 const http = require('http');
 const WebSocket = require('ws');
@@ -20,95 +19,118 @@ const stats = {
   totalSubscriptions: 0,
 };
 
-// ── Broker Events ───────────────────────────────────────────────────────────
-aedes.on('client', (client) => {
-  stats.totalClients++;
-  stats.activeClients++;
-  console.log(chalk.green(`  ● CLIENT CONNECTED: ${chalk.white.bold(client.id)}`));
-  console.log(chalk.gray(`    Active: ${stats.activeClients} | Total: ${stats.totalClients}`));
-});
+let aedes;
 
-aedes.on('clientDisconnect', (client) => {
-  stats.activeClients = Math.max(0, stats.activeClients - 1);
-  console.log(chalk.red(`  ○ CLIENT DISCONNECTED: ${chalk.white(client.id)}`));
-});
+async function startBroker() {
+  console.log(chalk.gray('  Initializing Aedes 1.x (ESM)...'));
+  
+  // Aedes 1.x migration: Use static async createBroker
+  const { Aedes } = await import('aedes');
+  aedes = await Aedes.createBroker();
 
-aedes.on('subscribe', (subscriptions, client) => {
-  stats.totalSubscriptions += subscriptions.length;
-  subscriptions.forEach((sub) => {
-    const isShared = sub.topic.startsWith('$share/');
-    const isWildcard = sub.topic.includes('+') || sub.topic.includes('#');
-    let badge = '';
-    if (isShared) badge = chalk.magenta(' [SHARED]');
-    else if (isWildcard) badge = chalk.yellow(' [WILDCARD]');
-
-    console.log(chalk.cyan(`  ⬇ SUBSCRIBE: ${chalk.white(client?.id || '?')} → ${chalk.bold(sub.topic)} QoS${sub.qos}${badge}`));
+  // ── Broker Events ───────────────────────────────────────────────────────────
+  aedes.on('client', (client) => {
+    stats.totalClients++;
+    stats.activeClients++;
+    console.log(chalk.green(`  ● CLIENT CONNECTED: ${chalk.white.bold(client.id)}`));
+    console.log(chalk.gray(`    Active: ${stats.activeClients} | Total: ${stats.totalClients}`));
   });
-});
 
-aedes.on('publish', (packet, client) => {
-  if (!client) return; // System messages
-  stats.totalPublished++;
+  aedes.on('clientDisconnect', (client) => {
+    stats.activeClients = Math.max(0, stats.activeClients - 1);
+    console.log(chalk.red(`  ○ CLIENT DISCONNECTED: ${chalk.white(client.id)}`));
+  });
 
-  const isRetain = packet.retain;
-  const qos = packet.qos;
-  const hasUserProps = packet.properties?.userProperties;
-  const hasAlias = packet.properties?.topicAlias;
-  const hasExpiry = packet.properties?.messageExpiryInterval;
+  aedes.on('subscribe', (subscriptions, client) => {
+    stats.totalSubscriptions += subscriptions.length;
+    subscriptions.forEach((sub) => {
+      const isShared = sub.topic.startsWith('$share/');
+      const isWildcard = sub.topic.includes('+') || sub.topic.includes('#');
+      let badge = '';
+      if (isShared) badge = chalk.magenta(' [SHARED]');
+      else if (isWildcard) badge = chalk.yellow(' [WILDCARD]');
 
-  let badges = `QoS${qos}`;
-  if (isRetain) badges += chalk.yellow(' [RETAIN]');
-  if (hasAlias) badges += chalk.blue(` [ALIAS:${hasAlias}]`);
-  if (hasExpiry) badges += chalk.gray(` [TTL:${hasExpiry}s]`);
-  if (hasUserProps) badges += chalk.magenta(' [PROPS]');
+      console.log(chalk.cyan(`  ⬇ SUBSCRIBE: ${chalk.white(client?.id || '?')} → ${chalk.bold(sub.topic)} QoS${sub.qos}${badge}`));
+    });
+  });
 
-  // Only log non-heartbeat to reduce noise
-  if (!packet.topic.includes('heartbeat')) {
-    console.log(chalk.blue(`  ⬆ PUBLISH: ${chalk.white(client.id)} → ${chalk.bold(packet.topic)} ${badges}`));
-  }
-});
+  aedes.on('publish', (packet, client) => {
+    if (!client) return; // System messages
+    stats.totalPublished++;
 
-// ── LWT handling ────────────────────────────────────────────────────────────
-aedes.on('clientError', (client, err) => {
-  console.log(chalk.red(`  ✖ CLIENT ERROR: ${client.id} - ${err.message}`));
-});
+    const isRetain = packet.retain;
+    const qos = packet.qos;
+    const hasUserProps = packet.properties?.userProperties;
+    const hasAlias = packet.properties?.topicAlias;
+    const hasExpiry = packet.properties?.messageExpiryInterval;
 
-aedes.on('connackSent', (packet, client) => {
-  // Check if client registered a will (LWT)
-  if (client.will) {
-    console.log(chalk.yellow(`  ⚡ LWT REGISTERED: ${client.id} → ${client.will.topic}`));
-  }
-});
+    let badges = `QoS${qos}`;
+    if (isRetain) badges += chalk.yellow(' [RETAIN]');
+    if (hasAlias) badges += chalk.blue(` [ALIAS:${hasAlias}]`);
+    if (hasExpiry) badges += chalk.gray(` [TTL:${hasExpiry}s]`);
+    if (hasUserProps) badges += chalk.magenta(' [PROPS]');
 
-// ── Start TCP Server ────────────────────────────────────────────────────────
-const tcpServer = net.createServer(aedes.handle);
-tcpServer.listen(MQTT_PORT, () => {
-  console.log('');
-  console.log(chalk.cyan.bold('  ╔══════════════════════════════════════════════════════╗'));
-  console.log(chalk.cyan.bold('  ║') + chalk.white.bold('   ⚡ NovaPulse MQTT Broker (Aedes) - MQTT 5.0      ') + chalk.cyan.bold('║'));
-  console.log(chalk.cyan.bold('  ╠══════════════════════════════════════════════════════╣'));
-  console.log(chalk.cyan.bold('  ║') + chalk.green(`   ▶ TCP Transport:       localhost:${MQTT_PORT}            `) + chalk.cyan.bold('║'));
-  console.log(chalk.cyan.bold('  ║') + chalk.green(`   ▶ WebSocket Transport: localhost:${WS_PORT}            `) + chalk.cyan.bold('║'));
-  console.log(chalk.cyan.bold('  ║') + chalk.yellow(`   ▶ Protocol:            MQTT 5.0                  `) + chalk.cyan.bold('║'));
-  console.log(chalk.cyan.bold('  ║') + chalk.magenta(`   ▶ Features:            All 10 MQTT features      `) + chalk.cyan.bold('║'));
-  console.log(chalk.cyan.bold('  ╚══════════════════════════════════════════════════════╝'));
-  console.log('');
-  console.log(chalk.gray('  Waiting for clients...'));
-  console.log(chalk.gray('  ' + '─'.repeat(55)));
-});
+    // Only log non-heartbeat to reduce noise
+    if (!packet.topic.includes('heartbeat')) {
+      console.log(chalk.blue(`  ⬆ PUBLISH: ${chalk.white(client.id)} → ${chalk.bold(packet.topic)} ${badges}`));
+    }
+  });
 
-// ── Start WebSocket Server (for browser dashboard) ──────────────────────────
-const httpServer = http.createServer();
-const wss = new WebSocket.Server({ server: httpServer });
+  aedes.on('clientError', (client, err) => {
+    if (client) {
+      console.log(chalk.red(`  ✖ CLIENT ERROR: ${client.id} - ${err.message}`));
+    } else {
+      console.log(chalk.red(`  ✖ BROKER ERROR: ${err.message}`));
+    }
+  });
 
-wss.on('connection', (ws, req) => {
-  const stream = WebSocket.createWebSocketStream(ws);
-  aedes.handle(stream);
-});
+  aedes.on('connackSent', (packet, client) => {
+    if (client.will) {
+      console.log(chalk.yellow(`  ⚡ LWT REGISTERED: ${client.id} → ${client.will.topic}`));
+    }
+  });
 
-httpServer.listen(WS_PORT, () => {
-  console.log(chalk.blue(`  🌐 WebSocket server ready on port ${WS_PORT}`));
-});
+  // ── Start TCP Server ────────────────────────────────────────────────────────
+  const tcpServer = net.createServer(aedes.handle);
+  tcpServer.listen(MQTT_PORT, () => {
+    console.log('');
+    console.log(chalk.cyan.bold('  ╔══════════════════════════════════════════════════════╗'));
+    console.log(chalk.cyan.bold('  ║') + chalk.white.bold('   ⚡ NovaPulse MQTT Broker (Aedes) - MQTT 5.0      ') + chalk.cyan.bold('║'));
+    console.log(chalk.cyan.bold('  ╠══════════════════════════════════════════════════════╣'));
+    console.log(chalk.cyan.bold('  ║') + chalk.green(`   ▶ TCP Transport:       localhost:${MQTT_PORT}            `) + chalk.cyan.bold('║'));
+    console.log(chalk.cyan.bold('  ║') + chalk.green(`   ▶ WebSocket Transport: localhost:${WS_PORT}            `) + chalk.cyan.bold('║'));
+    console.log(chalk.cyan.bold('  ║') + chalk.yellow(`   ▶ Protocol:            MQTT 5.0                  `) + chalk.cyan.bold('║'));
+    console.log(chalk.cyan.bold('  ║') + chalk.magenta(`   ▶ Features:            All 10 MQTT features      `) + chalk.cyan.bold('║'));
+    console.log(chalk.cyan.bold('  ╚══════════════════════════════════════════════════════╝'));
+    console.log('');
+    console.log(chalk.gray('  Waiting for clients...'));
+    console.log(chalk.gray('  ' + '─'.repeat(55)));
+  });
+
+  // ── Start WebSocket Server (for browser dashboard) ──────────────────────────
+  const httpServer = http.createServer();
+  const wss = new WebSocket.Server({ server: httpServer });
+
+  wss.on('connection', (ws, req) => {
+    const stream = WebSocket.createWebSocketStream(ws);
+    aedes.handle(stream);
+  });
+
+  httpServer.listen(WS_PORT, () => {
+    console.log(chalk.blue(`  🌐 WebSocket server ready on port ${WS_PORT}`));
+  });
+
+  // ── Graceful shutdown ───────────────────────────────────────────────────────
+  process.on('SIGINT', () => {
+    console.log(chalk.yellow('\n  Shutting down broker...'));
+    aedes.close(() => {
+      tcpServer.close();
+      httpServer.close();
+      console.log(chalk.green('  Broker stopped.'));
+      process.exit(0);
+    });
+  });
+}
 
 // ── Periodic stats log ──────────────────────────────────────────────────────
 setInterval(() => {
@@ -117,13 +139,8 @@ setInterval(() => {
   }
 }, 30000);
 
-// ── Graceful shutdown ───────────────────────────────────────────────────────
-process.on('SIGINT', () => {
-  console.log(chalk.yellow('\n  Shutting down broker...'));
-  aedes.close(() => {
-    tcpServer.close();
-    httpServer.close();
-    console.log(chalk.green('  Broker stopped.'));
-    process.exit(0);
-  });
+// Run the initialization
+startBroker().catch(err => {
+  console.error(chalk.red('  ✖ Failed to start broker:'), err);
+  process.exit(1);
 });
