@@ -26,7 +26,7 @@ const units = [
 const activeAlerts = [];
 
 // ── Connect with LWT ────────────────────────────────────────────────────────
-const brokerUrl = process.env.MQTT_URL || 'mqtt://localhost:1883';
+const brokerUrl = process.env.MQTT_URL || 'mqtt://localhost:1884';
 const client = mqtt.connect(brokerUrl, {
   clientId: CLIENT_ID,
   protocolVersion: 4,
@@ -194,6 +194,13 @@ function startDispatchSimulator() {
 function startUnitStatusPublisher() {
   setInterval(() => {
     units.forEach(unit => {
+      // FITUR MQTT 5.0: MESSAGE EXPIRY INTERVAL (PENGHAPUSAN DATA BASI)
+      // Data peringatan dari sensor memiliki nilai validitas yang sangat singkat. 
+      // Jika koneksi jaringan Command Center sempat terputus, fitur ini memerintahkan Broker 
+      // sempat terputus, fitur ini memerintahkan Broker untuk otomatis menghancurkan 
+      // data peringatan (alert) yang sudah kedaluwarsa. Hal ini mencegah operator 
+      // mengambil keputusan salah akibat membaca data kecelakaan yang sudah tidak relevan.
+      const expiry = EXPIRY.SHORT; // e.g., 60 seconds
       const topic = TOPICS.EMERGENCY.UNIT_STATUS(unit.id);
       // Feature 5: Retain (latest unit status always available)
       client.publish(topic, JSON.stringify({

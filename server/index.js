@@ -38,7 +38,7 @@ function startServer() {
   server.addService(environmentProto.citynexus.environment.EnvironmentService.service, environmentService);
   server.addService(emergencyProto.citynexus.emergency.EmergencyService.service, emergencyService);
 
-  const PORT = process.env.PORT || '50051';
+  const PORT = process.env.PORT || '50060';
   const address = `0.0.0.0:${PORT}`;
 
   server.bindAsync(address, grpc.ServerCredentials.createInsecure(), (err, port) => {
@@ -140,7 +140,7 @@ function startServer() {
         chalk.gray('   └── npm run client:dashboard'),
         '',
         chalk.cyan.bold('🌐  Web Dashboard:'),
-        chalk.green('   └── http://localhost:3000'),
+        chalk.green('   └── http://localhost:3010'),
       ];
 
       for (const line of lines) {

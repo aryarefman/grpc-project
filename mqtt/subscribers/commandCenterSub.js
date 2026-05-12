@@ -12,7 +12,7 @@ const RequestResponseHandler = require('../shared/requestResponse');
 
 const CLIENT_ID = 'novapulse-command-center';
 
-const brokerUrl = process.env.MQTT_URL || 'mqtt://localhost:1883';
+const brokerUrl = process.env.MQTT_URL || 'mqtt://localhost:1884';
 const client = mqtt.connect(brokerUrl, {
   clientId: CLIENT_ID,
   protocolVersion: 4,
@@ -109,6 +109,13 @@ client.on('message', (topic, payload, packet) => {
     console.log(chalk.bgGreen.black(`  ✅ PUBLISHER ONLINE: ${data.publisher || topic}  `));
     console.log('');
     return;
+  }
+
+  // Highlight external signals
+  if (topic.includes('system/external')) {
+    console.log(chalk.bgMagenta.white.bold(`  ⚠️  EXTERNAL SIGNAL DETECTED!  `));
+    console.log(chalk.magenta(`     Source: ${data.publisher} | Message: ${data.message}`));
+    console.log('');
   }
 
   // Print message

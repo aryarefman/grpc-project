@@ -12,7 +12,7 @@ const { WILDCARDS, SHARED_TOPICS } = require('../shared/topicRegistry');
 const instanceId = process.argv[2] || '1';
 const CLIENT_ID = `novapulse-public-alert-${instanceId}`;
 
-const brokerUrl = process.env.MQTT_URL || 'mqtt://localhost:1883';
+const brokerUrl = process.env.MQTT_URL || 'mqtt://localhost:1884';
 const client = mqtt.connect(brokerUrl, {
   clientId: CLIENT_ID,
   protocolVersion: 4,

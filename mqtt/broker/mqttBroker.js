@@ -9,8 +9,8 @@ const http = require('http');
 const WebSocket = require('ws');
 const chalk = require('chalk');
 
-const MQTT_PORT = 1883;
-const WS_PORT = 9001;
+const MQTT_PORT = 1884;
+const WS_PORT = 9002;
 
 // ── Statistics ──────────────────────────────────────────────────────────────
 const stats = {

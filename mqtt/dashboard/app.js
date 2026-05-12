@@ -211,7 +211,12 @@ function initMqttTopology() {
     type: 'circle',
     source: 'mqtt-nodes-source',
     paint: {
-      'circle-radius': ['case', ['==', ['get', 'isBroker'], true], 9, 7],
+      'circle-radius': [
+        'case',
+        ['==', ['get', 'isBroker'], true], 10,
+        ['==', ['get', 'color'], '#f472b6'], 10, // Larger for external pink nodes
+        7
+      ],
       'circle-color': ['get', 'color'],
       'circle-stroke-width': 2,
       'circle-stroke-color': '#ffffff',
@@ -241,7 +246,13 @@ function initMqttTopology() {
     const popupHtml = `
       <div class="custom-map-popup">
         <div class="popup-title" style="color:${props.color}; font-weight: bold; font-size: 1.1rem; padding-right: 24px;">${props.name}</div>
-        <div class="popup-role" style="font-size: 0.65rem; color: var(--text-faint); text-transform: uppercase; margin-bottom: 8px;">${props.role}</div>
+        <div class="popup-role" style="font-size: 0.65rem; color: var(--text-faint); text-transform: uppercase; margin-bottom: 8px;">
+          ${props.role}
+          <div style="margin-top: 4px; display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); color: var(--text-muted);">
+            <svg style="width:10px; height:10px; fill:currentColor"><use href="#icon-link"></use></svg>
+            [${mqttNodes[props.id].lat.toFixed(2)}°, ${mqttNodes[props.id].lng.toFixed(2)}°]
+          </div>
+        </div>
         
         <div class="popup-stats-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px;">
           <div class="pop-stat">
@@ -313,7 +324,7 @@ function registerDynamicNode(id, category) {
   const lat = (Math.random() * 120) - 60;
   const lng = (Math.random() * 360) - 180;
   
-  const colors = { traffic: '#38bdf8', environment: '#34d399', emergency: '#f87171', system: '#a78bfa' };
+  const colors = { traffic: '#38bdf8', environment: '#34d399', emergency: '#f87171', system: '#f472b6' };
   
   mqttNodes[id] = {
     name: id.toUpperCase().substring(0, 15),
@@ -354,7 +365,7 @@ function renderTopologyList() {
         <div class="node-indicator" style="background: ${node.color}; color: ${node.color}"></div>
         <div class="node-info">
           <div class="node-name">${node.name}</div>
-          <div class="node-role">${node.role}</div>
+          <div class="node-role">${node.role} • [${node.lat.toFixed(2)}°, ${node.lng.toFixed(2)}°]</div>
           <div class="node-details">
             <div class="signal-bars">${signalBars}</div>
             <div class="node-latency">${node.latency}ms</div>
@@ -387,14 +398,16 @@ function updateMapSource() {
         name: node.name,
         role: node.role,
         color: node.color,
-        isBroker: key === 'broker'
+        isBroker: key === 'broker' ? true : false
       }
     });
   });
 
   const source = map.getSource('mqtt-nodes-source');
   if (source) {
-    source.setData({ type: 'FeatureCollection', features: features });
+    // Force deep clone to break Mapbox cache
+    source.setData({ type: 'FeatureCollection', features: JSON.parse(JSON.stringify(features)) });
+    if (map.triggerRepaint) map.triggerRepaint();
   }
 }
 
@@ -416,7 +429,13 @@ function generateBezierCurve(start, end) {
   for (let i = 0; i <= 50; i++) {
     const t = i / 50;
     const x = (1-t)*(1-t)*start[0] + 2*(1-t)*t*ctrlX + t*t*end[0];
-    const y = (1-t)*(1-t)*start[1] + 2*(1-t)*t*ctrlY + t*t*end[1];
+    let y = (1-t)*(1-t)*start[1] + 2*(1-t)*t*ctrlY + t*t*end[1];
+    
+    // CRITICAL FIX: Clamp latitude to Mapbox Web Mercator limits (-85 to 85)
+    // If it exceeds this, Mapbox will silently fail to render the entire geometry.
+    if (y > 80) y = 80;
+    if (y < -80) y = -80;
+    
     points.push([x, y]);
   }
   return points;
@@ -476,7 +495,7 @@ function drawNetworkLines() {
 let activeLasers = 0;
 
 function shootLaser(startCoord, endCoord, color) {
-  if (!map.isStyleLoaded() || activeLasers > 15) return;
+  if (!map.isStyleLoaded() || activeLasers > 500) return;
   activeLasers++;
   
   const laserId = 'laser-' + Math.random().toString(36).substr(2, 9);
@@ -492,11 +511,11 @@ function shootLaser(startCoord, endCoord, color) {
     'type': 'circle',
     'source': laserId,
     'paint': {
-      'circle-radius': 4,
+      'circle-radius': 8,
       'circle-color': color,
       'circle-blur': 0.2,
-      'circle-stroke-width': 2,
-      'circle-stroke-color': '#fff'
+      'circle-stroke-width': 4,
+      'circle-stroke-color': '#ffffff'
     }
   });
 
@@ -534,7 +553,7 @@ map.on('style.load', () => {
 
 
 // ── MQTT Connection ─────────────────────────────────────────────────────────
-const client = mqtt.connect(`ws://${location.hostname}:9001`, {
+const client = mqtt.connect(`ws://${location.hostname}:9002`, {
   clientId: 'novapulse-dashboard-' + Math.random().toString(36).substring(7),
   clean: true,
   reconnectPeriod: 3000,
@@ -545,6 +564,11 @@ client.on('connect', () => {
   updateBrokerStatus(true);
 
   // Subscribe with multi-level wildcard (Feature 2)
+  // FITUR MQTT 5.0: WILDCARD (ROUTING DATA SKALA KOTA)
+  // Command Center tidak mungkin mendaftarkan jutaan sensor jalan satu per satu. 
+  // Dengan Wildcard (tanda #), server langsung membuka pintu untuk semua sensor 
+  // yang berada di bawah jaringan "novapulse/". Ini memungkinkan penambahan ribuan 
+  // sensor baru di lapangan kapan saja tanpa perlu mengubah satu baris kode pun di sisi Dashboard.
   client.subscribe('novapulse/#', { qos: 1 });
   state.features.wildcard = true;
   state.features.pubsub = true;
@@ -630,12 +654,25 @@ client.on('message', (topic, payload, packet) => {
   if (brokerStat) brokerStat.innerText = `Processed: ${mqttNodes['broker'].count}`;
 
   // Identify source node
+  const idMap = {
+    'novapulse-traffic-publisher': 'traffic',
+    'novapulse-environment-publisher': 'environment',
+    'novapulse-emergency-publisher': 'emergency',
+    'novapulse-command-center': 'command-center',
+    'novapulse-public-alert-1': 'public-alert',
+    'dashboard': 'command-center'
+  };
+
   let publisherId = data.publisher || data.unit_id || data.intersection_id || userProps.source;
-  let targetKey = (pubType && mqttNodes[pubType]) ? pubType : publisherId;
+  let targetKey = idMap[publisherId] || (pubType && mqttNodes[pubType] ? pubType : publisherId);
 
   if (targetKey) {
     if (!mqttNodes[targetKey]) {
       registerDynamicNode(targetKey, category);
+      // Automatically enroll burst test nodes into the periodic reporting loop
+      if (targetKey.includes('ext-') && !activeExternalNodes.includes(targetKey)) {
+        activeExternalNodes.push(targetKey);
+      }
     }
 
     const node = mqttNodes[targetKey];
@@ -670,7 +707,7 @@ client.on('message', (topic, payload, packet) => {
       shootLaser(
         [mqttNodes['broker'].lng, mqttNodes['broker'].lat],
         [mqttNodes['command-center'].lng, mqttNodes['command-center'].lat],
-        '#fbbf24'
+        node.color // Inherit the color of the originating publisher
       );
       
       // Public Alert receives emergency
@@ -959,6 +996,12 @@ function sendCommand() {
   };
   client.on('message', handler);
 
+  // FITUR MQTT 5.0: REQUEST-RESPONSE (AUDIT PERANGKAT REAL-TIME)
+  // Admin sering perlu mengaudit status mesin atau sensor secara instan 
+  // (misal: "Apakah kamera CCTV Bunderan HI masih aktif?").
+  // Melalui fitur ini, command center membuat jalur komunikasi privat sementara ("responseTopic")
+  // beserta nomor resi unik ("correlationData"). Sensor di lapangan akan langsung
+  // membalas ke jalur privat tersebut, mencegah kebocoran data keamanan ke publik.
   client.publish('novapulse/system/command/request', JSON.stringify({
     command: 'GET_STATUS', params: {}, timestamp: Date.now(),
     _props: {
@@ -972,55 +1015,156 @@ function sendCommand() {
 function burstTest() {
   const output = document.getElementById('command-output');
   output.classList.add('visible');
-  output.textContent = '>> Burst test: sending 50 messages...\n';
+  output.textContent = '>> Starting multi-source burst test (50 messages)...\n';
 
-  let sent = 0;
+  let count = 0;
   const interval = setInterval(() => {
-    if (sent >= 50) {
-      clearInterval(interval);
-      output.textContent += `<< Burst complete: ${sent} messages sent\n`;
-      state.features.flowctrl = true;
-      updateFeatures();
-      return;
-    }
-    client.publish(`novapulse/system/burst-test`, JSON.stringify({
-      seq: sent, total: 50, timestamp: Date.now(),
+    // Mix internal and external sources in the burst
+    const isExternal = Math.random() > 0.5;
+    const sourceId = isExternal ? `ext-burst-${Math.floor(Math.random()*1000)}` : 'dashboard';
+
+    client.publish('novapulse/system/burst-test', JSON.stringify({
+      id: count,
+      source: sourceId,
+      type: isExternal ? 'EXTERNAL_SURGE' : 'INTERNAL_LOAD',
+      timestamp: Date.now(),
       _props: {
-        messageExpiryInterval: 10,
-        userProperties: { 'source': 'dashboard', 'test': 'burst' },
+        // FITUR MQTT 5.0: USER PROPERTIES (PRIORITAS & FILTERING TANPA DECODE)
+        // Saat jutaan data masuk per detik, User Properties memungkinkan sensor menempelkan 
+        // status "priority: HIGH" di level jaringan (Header). Dampak nyatanya: Load Balancer 
+        // atau Router bisa memprioritaskan paket data darurat tanpa harus mengorbankan CPU 
+        // untuk membongkar dan memecahkan isi data Payload JSON-nya.
+        userProperties: { 'source': sourceId, 'priority': 'HIGH' }
       }
     }), { qos: 0 });
-    sent++;
-  }, 50);
-}
 
-function clearFeed() {
-  state.feedMessages = [];
-  const feed = document.getElementById('message-feed');
-  feed.innerHTML = `<div class="feed-empty"><div class="empty-state-v2">
-    <div class="radar-container">
-      <svg class="icon-lg"><use href="#icon-trash"></use></svg>
-    </div>
-    <div class="empty-title">FEED PURGED</div>
-    <div class="empty-desc">Message history has been cleared</div>
-  </div></div>`;
-  document.getElementById('feed-count').textContent = '0 MESSAGES';
+    count++;
+    if (count >= 50) {
+      clearInterval(interval);
+      output.textContent += '>> Burst test completed.\n';
+    }
+  }, 50);
 }
 
 function publishTestMessage() {
   const output = document.getElementById('command-output');
-  output.classList.add('visible');
+  if (output) output.classList.add('visible');
 
-  client.publish('novapulse/system/test', JSON.stringify({
-    message: 'Test message from dashboard',
+  client.publish('novapulse/emergency/alert/test', JSON.stringify({
+    type: 'TEST_MESSAGE',
+    content: 'Manually triggered QoS 2 validation',
     timestamp: Date.now(),
     _props: {
-      messageExpiryInterval: 60,
-      userProperties: { 'source': 'dashboard', 'test': 'manual', 'priority': 'LOW' },
+      // FITUR MQTT 5.0: USER PROPERTIES (METADATA KEAMANAN & SUMBER)
+      // Perangkat IoT menggunakan fitur ini untuk menempelkan sertifikat keamanan, 
+      // versi firmware, atau identitas perangkat (source). Server menggunakan metadata 
+      // ini untuk memblokir perangkat yang tidak valid sebelum data pesan tersebut 
+      // diproses lebih dalam ke sistem database.
+      userProperties: { 'source': 'novapulse-emergency-publisher', 'feature': 'qos2-validation' },
     }
-  }), { qos: 2, retain: false });
+  }), { qos: 2 });
 
-  output.textContent = '>> Test message published (QoS 2)\n';
+  if (output) output.textContent = '>> Emergency Test message published (QoS 2)\n';
+}
+
+// Track active external nodes
+const activeExternalNodes = [];
+
+function systemReady() {
+  const output = document.getElementById('command-output');
+  if (output) output.classList.add('visible');
+
+  // 1. Add a NEW node ONLY when button is clicked (Manual)
+  const randomSuffix = Math.random().toString(36).substring(7).toUpperCase();
+  const newId = `nova-ext-${randomSuffix}`;
+  
+  // Register the node first!
+  registerDynamicNode(newId, 'system');
+  activeExternalNodes.push(newId);
+
+  // 2. Immediate signal for the new node
+  sendExternalUpdate(newId, 'INITIALIZING');
+
+  if (output) output.textContent = `>> New External Node Registered: ${newId}. Total active: ${activeExternalNodes.length}\n`;
+}
+
+// Function to send update for a specific node
+function sendExternalUpdate(id, status = 'ACTIVE') {
+  client.publish('novapulse/system/external/ready', JSON.stringify({
+    publisher: id,
+    status: status,
+    message: 'Periodic System Health Check',
+    timestamp: Date.now(),
+    _props: {
+      userProperties: { 'source': id, 'type': 'external-validator' },
+    }
+  }), { qos: 1 });
+}
+
+// 3. AUTOMATIC: Send updates for ALL existing nodes every 15 seconds (Normal Mode)
+setInterval(() => {
+  if (activeExternalNodes.length > 0) {
+    // FITUR MQTT 5.0: FLOW CONTROL (PENCEGAHAN BOTTLENECK & DDOS)
+    // Jika terjadi bencana, jutaan sensor akan membanjiri server secara serentak 
+    // (Traffic Spike). Flow Control mengizinkan penerima (client) menentukan batas 
+    // aman jumlah pesan per detik. Di kode ini kita mensimulasikan mekanisme tersebut 
+    // dengan "Dynamic Stagger", memaksa antrean data agar diolah secara bergelombang 
+    // untuk mencegah server crash.
+    // Dynamic Stagger: Compress all lasers into a quick 3-second wave
+    // This ensures there is a long visual "silence" so the 15s interval is obvious.
+    const staggerTime = Math.min(300, 3000 / activeExternalNodes.length);
+    
+    activeExternalNodes.forEach((id, index) => {
+      setTimeout(() => sendExternalUpdate(id), index * staggerTime);
+    });
+  }
+}, 15000);
+
+function clearFeed() {
+  const output = document.getElementById('command-output');
+  if (output) output.textContent = '>> Resetting environment and purging feed...\n';
+
+  // 1. Reset Global State
+  state.messages = 0;
+  state.retained = 0;
+  state.qos = { 0: 0, 1: 0, 2: 0 };
+  state.topics.clear();
+  state.feedMessages = [];
+  state.throughputWindow = [];
+
+  // 2. Reset Publisher Stats
+  for (const pub of Object.values(state.publishers)) {
+    pub.count = 0;
+    pub.rate = 0;
+    pub._window = [];
+  }
+
+  // 3. Clear Visual Feed
+  const feed = document.getElementById('message-feed');
+  if (feed) feed.innerHTML = '<div class="feed-empty"><div class="empty-state-v2"><div class="radar-container"><svg class="icon-lg"><use href="#icon-trash"></use></svg></div><div class="empty-title">SYSTEM RESET</div><div class="empty-desc">All dynamic nodes and logs have been cleared.</div></div></div>';
+  document.getElementById('feed-count').textContent = '0 MESSAGES';
+
+  // 4. Reset Topology Nodes
+  const staticKeys = ['broker', 'traffic', 'environment', 'emergency', 'command-center', 'public-alert'];
+  Object.keys(mqttNodes).forEach(key => {
+    if (!staticKeys.includes(key)) {
+      delete mqttNodes[key];
+    } else {
+      mqttNodes[key].count = 0;
+      mqttNodes[key].lastPayload = '-';
+      mqttNodes[key].latency = 0;
+      
+      const nodeStatEl = document.getElementById(`node-stat-${key}`);
+      if (nodeStatEl) nodeStatEl.innerText = key === 'broker' ? 'Processed: 0' : (key === 'command-center' ? 'Received: 0' : 'Active: 0');
+    }
+  });
+
+  // 5. Update UI
+  activeExternalNodes.length = 0;
+  updateTopologyList();
+  updateMapSource();
+  drawNetworkLines();
+  updateStats();
 }
 
 // ── Utilities ───────────────────────────────────────────────────────────────

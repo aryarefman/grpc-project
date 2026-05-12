@@ -35,7 +35,7 @@ const thresholds = {
 };
 
 // ── Connect with LWT ────────────────────────────────────────────────────────
-const brokerUrl = process.env.MQTT_URL || 'mqtt://localhost:1883';
+const brokerUrl = process.env.MQTT_URL || 'mqtt://localhost:1884';
 const client = mqtt.connect(brokerUrl, {
   clientId: CLIENT_ID,
   protocolVersion: 4,

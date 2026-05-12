@@ -9,7 +9,7 @@ const packageDef = protoLoader.loadSync(PROTO_PATH, {
 });
 const proto = grpc.loadPackageDefinition(packageDef);
 
-const SERVER_ADDRESS = process.env.SERVER_ADDRESS || 'localhost:50051';
+const SERVER_ADDRESS = process.env.SERVER_ADDRESS || 'localhost:50060';
 const client = new proto.citynexus.environment.EnvironmentService(
   SERVER_ADDRESS, grpc.credentials.createInsecure()
 );

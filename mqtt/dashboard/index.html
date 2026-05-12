@@ -106,7 +106,7 @@
         <span id="broker-status-text" class="ws-label">ESTABLISHING LINK...</span>
       </div>
       <div class="topnav-right">
-        <a href="http://localhost:3000" class="btn btn-ghost" style="height: 32px; padding: 0 12px; font-size: 0.7rem; border-color: var(--border); text-decoration: none; display: flex; align-items: center; gap: 6px;" title="Back to Main Dashboard">
+        <a href="http://localhost:3020" class="btn btn-ghost" style="height: 32px; padding: 0 12px; font-size: 0.7rem; border-color: var(--border); text-decoration: none; display: flex; align-items: center; gap: 6px;" title="Back to Main Dashboard">
           <svg class="icon-sm" style="width: 14px; height: 14px;"><use href="#icon-activity"></use></svg>
           <span>MAIN DASHBOARD</span>
         </a>
@@ -386,7 +386,7 @@
   <!-- ║      FLOATING CONTROL HUB        ║ -->
   <!-- ╚══════════════════════════════════╝ -->
   <div id="controls-popup" class="floating-controls-container hidden">
-    <div class="controls-card card">
+    <div class="controls-card card" style="background: rgba(0, 0, 0, 0.2) !important; backdrop-filter: blur(8px) !important; border-color: rgba(255,255,255,0.2) !important;">
       <div class="card-header">
         <div class="card-title-group">
           <svg class="icon-sm"><use href="#icon-bolt"></use></svg>
@@ -401,11 +401,14 @@
         <button class="btn btn-danger" id="btn-burst" onclick="burstTest()">
           <svg class="icon-sm"><use href="#icon-zap"></use></svg> BURST TEST
         </button>
-        <button class="btn btn-ghost" id="btn-clear-feed" onclick="clearFeed()">
-          <svg class="icon-sm"><use href="#icon-trash"></use></svg> PURGE FEED
-        </button>
         <button class="btn btn-primary" id="btn-publish-test" onclick="publishTestMessage()" style="background: var(--cyan); color: #fff;">
           <svg class="icon-sm"><use href="#icon-upload"></use></svg> PUBLISH TEST
+        </button>
+        <button class="btn btn-primary" id="btn-system-ready" onclick="systemReady()" style="background: #f472b6; color: #fff;">
+          <svg class="icon-sm"><use href="#icon-activity"></use></svg> SYSTEM READY
+        </button>
+        <button class="btn btn-ghost" id="btn-clear-feed" onclick="clearFeed()" style="grid-column: span 2;">
+          <svg class="icon-sm"><use href="#icon-trash"></use></svg> PURGE FEED
         </button>
       </div>
       <div class="cmd-output" id="command-output" role="status" aria-live="polite">SYSTEM READY</div>
