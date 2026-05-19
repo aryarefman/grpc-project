@@ -6,7 +6,7 @@ const path = require('path');
 const LOG_FILE = path.join(__dirname, '..', 'services.log');
 const logStream = fs.createWriteStream(LOG_FILE, { flags: 'w' }); // Use 'w' to clear logs on every start
 
-const PORTS = [3020, 3011, 50060, 1884, 9002];
+const PORTS = [3020, 3011, 50051, 1884, 9002];
 
 const services = [
   { name: 'CORE: SERVER & WEB', command: 'npm', args: ['run', 'server'], color: 'cyan' },

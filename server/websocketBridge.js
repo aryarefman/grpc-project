@@ -22,7 +22,7 @@ const trafficProto   = grpc.loadPackageDefinition(protoLoader.loadSync(path.join
 const emergencyProto = grpc.loadPackageDefinition(protoLoader.loadSync(path.join(__dirname, '..', 'protos', 'emergency.proto'), PROTO_OPTIONS));
 const environmentProto = grpc.loadPackageDefinition(protoLoader.loadSync(path.join(__dirname, '..', 'protos', 'environment.proto'), PROTO_OPTIONS));
 
-const GRPC_ADDR = 'localhost:50060';
+const GRPC_ADDR = 'localhost:50051';
 
 function makeClients() {
   const trafficClient   = new trafficProto.citynexus.traffic.TrafficService(GRPC_ADDR,   grpc.credentials.createInsecure());

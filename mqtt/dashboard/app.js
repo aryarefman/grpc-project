@@ -555,11 +555,10 @@ map.on('style.load', () => {
 // ── MQTT Connection (MQTT 5.0) ──────────────────────────────────────────────
 const client = mqtt.connect(`ws://${location.hostname}:9002`, {
   clientId: 'novapulse-dashboard-' + Math.random().toString(36).substring(7),
-  protocolVersion: 4,    // MQTT 5.0 for real properties support
+  protocolVersion: 4,    // MQTT 3.1.1 (Aedes compatible)
   clean: true,
   reconnectPeriod: 3000,
-  // MQTT 5.0 Flow Control: broker enforces receiveMaximum
-  
+  // Fitur 10: Flow Control diimplementasikan di publisher side (FlowController)
 });
 
 client.on('connect', () => {

@@ -6,9 +6,10 @@
 const mqtt = require('mqtt');
 const chalk = require('chalk');
 const { v4: uuidv4 } = require('uuid');
-const { TOPICS, ZONES, SENSOR_TYPES } = require('../shared/topicRegistry');
+const { TOPICS, ZONES, SENSOR_TYPES, TOPIC_ALIASES } = require('../shared/topicRegistry');
 const { QOS, EXPIRY, FLOW_CONTROL, LWT_PROPERTIES } = require('../shared/mqttFeatures');
 const ResponseHandler = require('../shared/responseHandler');
+const FlowController = require('../shared/flowController');
 
 const CLIENT_ID = 'novapulse-environment-publisher';
 const PUBLISHER_ID = 'environment-publisher';
@@ -36,9 +37,9 @@ const thresholds = {
 const brokerUrl = process.env.MQTT_URL || 'mqtt://localhost:1884';
 const client = mqtt.connect(brokerUrl, {
   clientId: CLIENT_ID,
-  protocolVersion: 4,
+  protocolVersion: 4,    // MQTT 3.1.1 (Aedes compatible)
   clean: true,
-  
+  // Fitur 10: Flow Control diimplementasikan di level aplikasi (FlowController)
   will: {
     topic: TOPICS.SYSTEM.STATUS(PUBLISHER_ID),
     payload: JSON.stringify({
@@ -56,27 +57,19 @@ const client = mqtt.connect(brokerUrl, {
 
 let publishCount = 0;
 
-const originalPublish = client.publish.bind(client);
-client.publish = function(topic, message, options, callback) {
-  let payload = message;
-  if (options && options.properties) {
-    try {
-      const obj = JSON.parse(message.toString());
-      if (options.properties.userProperties) obj._props = options.properties.userProperties;
-      if (options.properties.messageExpiryInterval) { obj._expiry = Date.now() + (options.properties.messageExpiryInterval * 1000); obj._ttl = options.properties.messageExpiryInterval; }
-      payload = JSON.stringify(obj);
-    } catch(e) {}
-  }
-  return originalPublish(topic, payload, options, callback);
-};
+let flowCtrl;
+
 client.on('connect', () => {
+  flowCtrl = new FlowController(client, CLIENT_ID, FLOW_CONTROL.RECEIVE_MAXIMUM);
+  flowCtrl.startPeriodicLog(30000);
+
   console.log('');
   console.log(chalk.green.bold('  ╔══════════════════════════════════════════════════════╗'));
   console.log(chalk.green.bold('  ║') + chalk.white.bold('   🌿 Environment Sensor Publisher - ONLINE          ') + chalk.green.bold('║'));
   console.log(chalk.green.bold('  ╠══════════════════════════════════════════════════════╣'));
   console.log(chalk.green.bold('  ║') + chalk.cyan('   Sensors: ' + sensors.length + ' active across ' + new Set(sensors.map(s => s.zone)).size + ' zones'.padEnd(27)) + chalk.green.bold('║'));
-  console.log(chalk.green.bold('  ║') + chalk.yellow('   Protocol: MQTT 5.0 | LWT: Registered'.padEnd(51)) + chalk.green.bold('║'));
-  console.log(chalk.green.bold('  ║') + chalk.magenta('   Flow Control: receiveMax=' + FLOW_CONTROL.RECEIVE_MAXIMUM) + chalk.green.bold('            ║'));
+  console.log(chalk.green.bold('  ║') + chalk.yellow('   Protocol: MQTT 3.1.1 | LWT: Registered'.padEnd(51)) + chalk.green.bold('║'));
+  console.log(chalk.green.bold('  ║') + chalk.blue('   Flow Control: receiveMax=' + FLOW_CONTROL.RECEIVE_MAXIMUM + ' (app-level)           ') + chalk.green.bold('║'));
   console.log(chalk.green.bold('  ╚══════════════════════════════════════════════════════╝'));
   console.log('');
 
@@ -122,9 +115,14 @@ function startSensorPublisher() {
       value: sensor.value, unit: sensor.unit, quality: getQuality(sensor), timestamp: Date.now(),
     });
 
-    client.publish(topic, payload, {
+    // Fitur 3: Topic Alias — ambil alias dari registry, hemat bandwidth
+    // Fitur 4: User Properties — metadata sensor di packet level
+    // Fitur 6: Message Expiry — broker drop pesan setelah 300 detik
+    const sensorTopic = topic;
+    client.publish(sensorTopic, payload, {
       qos: QOS.AT_MOST_ONCE,
       properties: {
+        topicAlias: TOPIC_ALIASES[sensorTopic],     // Fitur 3: Topic Alias
         messageExpiryInterval: EXPIRY.ENVIRONMENT_READING,
         userProperties: { 'source': CLIENT_ID, 'sensor-id': sensor.id, 'sensor-type': sensor.type, 'zone': sensor.zone, 'unit': sensor.unit, 'quality': getQuality(sensor) },
       }
@@ -195,9 +193,10 @@ function startSummaryPublisher() {
 
 function startHeartbeat() {
   setInterval(() => {
-    client.publish(TOPICS.SYSTEM.HEARTBEAT, JSON.stringify({
+    const hbTopic = TOPICS.SYSTEM.HEARTBEAT;
+    client.publish(hbTopic, JSON.stringify({
       publisher: CLIENT_ID, type: 'environment', uptime: process.uptime(), publishCount, timestamp: Date.now(),
-    }), { qos: 0, properties: { messageExpiryInterval: EXPIRY.SYSTEM_HEARTBEAT, userProperties: { 'source': CLIENT_ID, 'type': 'heartbeat' } } });
+    }), { qos: 0, properties: { topicAlias: TOPIC_ALIASES[hbTopic], messageExpiryInterval: EXPIRY.SYSTEM_HEARTBEAT, userProperties: { 'source': CLIENT_ID, 'type': 'heartbeat' } } });
   }, 5000);
 }
 

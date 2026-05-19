@@ -15,10 +15,10 @@ const CLIENT_ID = 'novapulse-command-center';
 const brokerUrl = process.env.MQTT_URL || 'mqtt://localhost:1884';
 const client = mqtt.connect(brokerUrl, {
   clientId: CLIENT_ID,
-  protocolVersion: 4,    // FIX: MQTT 5.0
+  protocolVersion: 4,    // MQTT 3.1.1 (Aedes compatible)
   clean: true,
-  // FIX Masalah 4: Flow Control di connection level
-  
+  // Fitur 10: Flow Control — diimplementasikan oleh FlowController di publisher side
+  // Subscriber menerima backpressure signal via aplikasi-level queue
 });
 
 let reqRes;

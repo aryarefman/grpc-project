@@ -38,7 +38,7 @@ function startServer() {
   server.addService(environmentProto.citynexus.environment.EnvironmentService.service, environmentService);
   server.addService(emergencyProto.citynexus.emergency.EmergencyService.service, emergencyService);
 
-  const PORT = process.env.PORT || '50060';
+  const PORT = process.env.PORT || '50051';
   const address = `0.0.0.0:${PORT}`;
 
   server.bindAsync(address, grpc.ServerCredentials.createInsecure(), (err, port) => {

@@ -66,9 +66,9 @@ async function startBroker() {
 
     let badges = `QoS${qos}`;
     if (isRetain) badges += chalk.yellow(' [RETAIN]');
-    if (hasAlias) badges += chalk.blue(` [ALIAS:${hasAlias}]`);
-    if (hasExpiry) badges += chalk.gray(` [TTL:${hasExpiry}s]`);
-    if (hasUserProps) badges += chalk.magenta(' [PROPS]');
+    if (hasAlias) badges += chalk.blue(` [ALIAS:${hasAlias}]`);   // Fitur 3: Topic Alias
+    if (hasExpiry) badges += chalk.gray(` [TTL:${hasExpiry}s]`);  // Fitur 6: Expiry
+    if (hasUserProps) badges += chalk.magenta(' [PROPS]');        // Fitur 4: User Properties
 
     // Only log non-heartbeat to reduce noise
     if (!packet.topic.includes('heartbeat')) {
@@ -87,6 +87,11 @@ async function startBroker() {
   aedes.on('connackSent', (packet, client) => {
     if (client.will) {
       console.log(chalk.yellow(`  ⚡ LWT REGISTERED: ${client.id} → ${client.will.topic}`));
+    }
+    // Fitur 10: Flow Control — log receiveMaximum yang dinegosiasi client
+    const receiveMax = client.connDetails?.properties?.receiveMaximum;
+    if (receiveMax) {
+      console.log(chalk.blue(`  🔀 FLOW CONTROL: ${client.id} receiveMaximum=${receiveMax}`));
     }
   });
 

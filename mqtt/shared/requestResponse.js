@@ -66,6 +66,8 @@ class RequestResponseHandler {
     clearTimeout(pending.timeout);
     this.pendingRequests.delete(correlationId);
     this.client.unsubscribe(topic);
+    
+    console.log(`⟵  RESPONSE matched correlationId: ${correlationId}`);
 
     pending.resolve(data);
     return true;

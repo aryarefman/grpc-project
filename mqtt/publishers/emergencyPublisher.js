@@ -9,6 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const { TOPICS, ZONES } = require('../shared/topicRegistry');
 const { QOS, EXPIRY, FLOW_CONTROL, LWT_PROPERTIES } = require('../shared/mqttFeatures');
 const ResponseHandler = require('../shared/responseHandler');
+const FlowController = require('../shared/flowController');
 
 const CLIENT_ID = 'novapulse-emergency-publisher';
 const PUBLISHER_ID = 'emergency-publisher';
@@ -28,9 +29,11 @@ const activeAlerts = [];
 const brokerUrl = process.env.MQTT_URL || 'mqtt://localhost:1884';
 const client = mqtt.connect(brokerUrl, {
   clientId: CLIENT_ID,
-  protocolVersion: 4,
+  protocolVersion: 4,    // MQTT 3.1.1 (Aedes compatible)
   clean: true,
+  // Fitur 10: Flow Control diimplementasikan di level aplikasi (FlowController)
   
+  // ── Fitur 7: LWT ───────────────────────────────────────────────────────────────
   will: {
     topic: TOPICS.SYSTEM.STATUS(PUBLISHER_ID),
     payload: JSON.stringify({
@@ -48,6 +51,9 @@ const client = mqtt.connect(brokerUrl, {
 
 let publishCount = 0;
 
+// Fitur 10: Flow Controller
+let flowCtrl;
+
 const originalPublish = client.publish.bind(client);
 client.publish = function(topic, message, options, callback) {
   let payload = message;
@@ -62,13 +68,15 @@ client.publish = function(topic, message, options, callback) {
   return originalPublish(topic, payload, options, callback);
 };
 client.on('connect', () => {
+  flowCtrl = new FlowController(client, CLIENT_ID, FLOW_CONTROL.RECEIVE_MAXIMUM);
+  flowCtrl.startPeriodicLog(30000);
   console.log('');
   console.log(chalk.red.bold('  ╔══════════════════════════════════════════════════════╗'));
   console.log(chalk.red.bold('  ║') + chalk.white.bold('   🚨 Emergency Dispatch Publisher - ONLINE          ') + chalk.red.bold('║'));
   console.log(chalk.red.bold('  ╠══════════════════════════════════════════════════════╣'));
   console.log(chalk.red.bold('  ║') + chalk.cyan('   Units: ' + units.length + ' | Status: All systems nominal'.padEnd(41)) + chalk.red.bold('║'));
-  console.log(chalk.red.bold('  ║') + chalk.yellow('   Protocol: MQTT 5.0 | LWT: Registered'.padEnd(51)) + chalk.red.bold('║'));
-  console.log(chalk.red.bold('  ║') + chalk.magenta('   Flow Control: receiveMax=' + FLOW_CONTROL.RECEIVE_MAXIMUM) + chalk.red.bold('            ║'));
+  console.log(chalk.red.bold('  ║') + chalk.yellow('   Protocol: MQTT 3.1.1 | LWT: Registered'.padEnd(51)) + chalk.red.bold('║'));
+  console.log(chalk.red.bold('  ║') + chalk.blue('   Flow Control: receiveMax=' + FLOW_CONTROL.RECEIVE_MAXIMUM + ' (app-level)           ') + chalk.red.bold('║'));
   console.log(chalk.red.bold('  ╚══════════════════════════════════════════════════════╝'));
   console.log('');
 

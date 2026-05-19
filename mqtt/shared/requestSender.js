@@ -40,6 +40,7 @@ class RequestSender {
   // targetPublisherId: 'traffic-publisher' | 'environment-publisher' | 'emergency-publisher'
   async sendRequest(targetPublisherId, command, params = {}, timeoutMs = 5000) {
     const correlationId = uuidv4().substring(0, 8);
+    console.log(`⟶  REQUEST: ${command} | correlationId: ${correlationId}`);
     const responseTopic = TOPICS.SYSTEM.COMMAND_RESPONSE(correlationId);
 
     return new Promise((resolve, reject) => {

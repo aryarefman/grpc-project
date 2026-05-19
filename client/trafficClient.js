@@ -8,7 +8,7 @@ const packageDef = protoLoader.loadSync(PROTO_PATH, {
   keepCase: true, longs: String, enums: String, defaults: true, oneofs: true,
 });
 const trafficProto = grpc.loadPackageDefinition(packageDef).citynexus.traffic;
-const client = new trafficProto.TrafficService('localhost:50060', grpc.credentials.createInsecure());
+const client = new trafficProto.TrafficService('localhost:50051', grpc.credentials.createInsecure());
 
 function printMenu() {
   const W = 40; // lebar konten visible — item terpanjang 37 char

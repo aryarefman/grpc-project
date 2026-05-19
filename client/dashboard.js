@@ -7,7 +7,7 @@ const PROTO_OPTIONS = {
   keepCase: true, longs: String, enums: String, defaults: true, oneofs: true,
 };
 
-const SERVER_ADDRESS = process.env.SERVER_ADDRESS || 'localhost:50060';
+const SERVER_ADDRESS = process.env.SERVER_ADDRESS || 'localhost:50051';
 
 const trafficProto = grpc.loadPackageDefinition(
   protoLoader.loadSync(path.join(__dirname, '..', 'protos', 'traffic.proto'), PROTO_OPTIONS)
